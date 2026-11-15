@@ -17,17 +17,23 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
 
 from capture.scale import PLATE_DIAMETER_CM, PlateEllipse, fit_plate_ellipse, scale_from_ellipse
 from core.types import DepthMap, ImageBGR, Mask
 from depth.estimator import DepthEstimator, depth_scale
-from depth.plane import fit_plane, height_map
+from depth.plane import fit_plane_robust, height_map
 
 WELL_FRACTION = 0.75
 """Plane-fit pixels are kept inside this fraction of the rim ellipse, to skip the
 sloped rim. A guess from typical plate shapes; not measured on a Village plate."""
+
+FOOD_MARGIN_FRACTION = 0.03
+"""Bare plate within this fraction of the plate diameter of any food (about 6.5 mm on the
+21.59 cm Village plate) is left out of the plane fit. On the first real photos Depth
+Anything 3 showed false height right next to food; fitting through it lifts the plane."""
 
 MIN_SURFACE_PX = 50
 """Below this many bare well pixels the plane fit falls back to all bare plate pixels."""
@@ -159,6 +165,8 @@ def volumes_from_depth(
     plate_diameter_cm: float = PLATE_DIAMETER_CM,
     rim_height_cm: float = 0.0,
     well_fraction: float = WELL_FRACTION,
+    food_margin_fraction: float = FOOD_MARGIN_FRACTION,
+    robust: bool = False,
 ) -> PlateMeasurement | None:
     """Per-food volume from an up-to-scale (or metric) depth map of one plate.
 
@@ -171,6 +179,10 @@ def volumes_from_depth(
         rim_height_cm: height of the rim above the well floor. 0 treats the plate
             as flat; the Village plate's value has not been measured yet.
         well_fraction: see ``WELL_FRACTION``.
+        food_margin_fraction: see ``FOOD_MARGIN_FRACTION``; 0 fits right up to the food.
+        robust: trimmed plane fit (``depth.plane.fit_plane_robust``). Off by default: on
+            the first real rice photo it halved the volume (119 ml plain, 52 ml trimmed) and
+            nothing can say which is right until plates are weighed.
 
     Returns:
         None when the plate cannot serve as the scale (clipped, implausible) or
@@ -193,6 +205,13 @@ def volumes_from_depth(
     for m in food_masks:
         food_any |= m
     bare = plate_mask & ~food_any
+    margin = round(food_margin_fraction * ellipse.major_px)
+    if margin > 0 and food_any.any():
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * margin + 1, 2 * margin + 1))
+        near_food = cv2.dilate(food_any.astype(np.uint8), kernel).astype(bool)
+        clear = bare & ~near_food
+        if int(clear.sum()) >= MIN_SURFACE_PX:
+            bare = clear
     surface = bare & ellipse_mask(depth.shape, ellipse, well_fraction)
     if int(surface.sum()) < MIN_SURFACE_PX:
         surface = bare
@@ -201,7 +220,12 @@ def volumes_from_depth(
 
     scale = depth_scale(depth, surface, distance, anchor_xy=ellipse.center)
     depth_cm = (depth.astype(np.float64) * scale).astype(np.float32)
-    heights = height_map(depth_cm, fit_plane(depth_cm, surface))
+    plane = (
+        fit_plane_robust(depth_cm, surface)
+        if robust
+        else fit_plane_robust(depth_cm, surface, keep=1.0, rounds=0)
+    )
+    heights = height_map(depth_cm, plane)
     volumes = tuple(food_volume_ml(heights, depth_cm, m, focal_px) for m in food_masks)
     return PlateMeasurement(volumes, cm_per_px, focal_px, distance, scale, ellipse)
 

@@ -60,7 +60,7 @@ def create_app(
                     cfg.seg_model,
                     hall=cfg.hall,
                     data_dir=cfg.data_dir,
-                    today=lambda: datetime.now(ZoneInfo(cfg.timezone)).date(),
+                    today=lambda: cfg.menu_date or datetime.now(ZoneInfo(cfg.timezone)).date(),
                     focal_px=cfg.focal_px,
                 )
             )

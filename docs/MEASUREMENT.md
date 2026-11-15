@@ -92,3 +92,43 @@ Village plate under the rig camera.
 From the official repository (`ByteDance-Seed/Depth-Anything-3`): install
 `torch`/`torchvision`, then `pip install -e .` in a clone. The `depth-anything-3`
 package on PyPI is not published by the DA3 authors; do not use it.
+
+## First run on real photos (15 Nov 2026)
+
+`notebooks/colab_pipeline_real.ipynb`, Colab T4: `village-v2.onnx`, DA3-Small and
+SigLIP 2 on six Village photos from 14 Nov, matched against that evening's Dinner menu.
+This checks that the stages run and give physically sensible output. **No grams are
+validated**: no plate has been weighed.
+
+What it showed:
+
+* All three models loaded and ran end to end.
+* The empty plate (`empty_p1_clean_01`) had no food regions.
+* Camera height recovered from the plate's known 21.59 cm diameter: 21-46 cm across the
+  photos, consistent with a hand-held phone.
+* Every real food was matched to a dish on the menu: Assorted French Fries, Roasted Lemon
+  Zest Asparagus, Rice Pilaf, Garlic and Herb Roasted Chicken.
+* The focal length DA3 predicts (1339-1551 px) and the iPhone main camera's nominal value
+  (1156 px at 1600 px wide) disagree, and volume moves one-for-one with focal length:
+  the two estimates of the same food differed by roughly 15-35%. A one-off focal
+  calibration of the rig camera removes this uncertainty.
+* Height maps: the bare plate was flat apart from a band of false height right beside the
+  food (DA3 blurs depth across food edges) and at the raised rim.
+
+Changes made in response:
+
+* `api/pipeline.py`: food regions under 2 ml are dropped before matching. Small false
+  detections measured 0.0 ml and were still being given a dish name.
+* `depth/volume.py`: bare plate within 3% of the plate diameter of any food is left out of
+  the plane fit. On a synthetic plate with a 1 cm halo round a 60 ml block this removes a
+  3% under-count (`tests/test_depth.py`). On the real rice photo it changed the volume by
+  under 1% (118.7 to 119.5 ml).
+* A trimmed refit of the plane (`depth.plane.fit_plane_robust`) was also tried. On the same
+  rice photo it halved the volume (119.5 to 51.6 ml). A step that sensitive cannot be
+  trusted without weighed plates, so it is **off by default** (`robust=False`).
+
+The same photo measured 137 ml on Colab (GPU, two detected regions) and 119 ml on a Mac
+(CPU, one region). That gap is not explained yet.
+
+Known gap: a pile of fries was segmented on its top layer only, so its volume is likely
+low. Weighing a handful of plates is the next step for any accuracy claim.

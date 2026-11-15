@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from analytics.assumptions import CostFactors
@@ -29,6 +30,8 @@ class Settings:
     """ONNX segmentation model for ``POST /plates/image``."""
     focal_px: float | None = None
     """Calibrated focal length of the rig camera in frame pixels; None uses the depth model's."""
+    menu_date: date | None = None
+    """Match photos against this day's menu instead of today's (replaying old photos in a demo)."""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -45,5 +48,8 @@ class Settings:
             seg_model=Path(os.environ.get("LEFTOVER_SEG_MODEL", "models/village-v2.onnx")),
             focal_px=float(os.environ["LEFTOVER_FOCAL_PX"])
             if os.environ.get("LEFTOVER_FOCAL_PX")
+            else None,
+            menu_date=date.fromisoformat(os.environ["LEFTOVER_MENU_DATE"])
+            if os.environ.get("LEFTOVER_MENU_DATE")
             else None,
         )

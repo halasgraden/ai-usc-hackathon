@@ -144,6 +144,29 @@ def test_run_measures_grams_and_matches_each_class_once() -> None:
     assert fries.volume_ml == 15.0  # union of two overlapping boxes: 150 px
 
 
+def test_near_zero_volume_regions_are_dropped_before_matching() -> None:
+    class Calls(FakeMatcher):
+        def __init__(self, names: dict[FoodCategory, str | None]) -> None:
+            super().__init__(names)
+            self.seen: list[FoodCategory] = []
+
+        def match(self, image: ImageBGR, region: FoodRegion) -> DishMatch:
+            self.seen.append(region.category)
+            return super().match(image, region)
+
+    matcher = Calls({RICE: "Rice Pilaf", FRIES: "Baked Potatoes"})
+    pipe = _pipeline(
+        [
+            FoodRegion(_box(10, 20, 10, 20), RICE, 0.9),  # 100 px -> 10 ml
+            FoodRegion(_box(40, 41, 40, 50), FRIES, 0.4),  # 10 px -> 1 ml: a false detection
+        ]
+    )
+    pipe.matcher_for = lambda _meal: matcher
+    out = pipe.run(IMAGE, "Dinner")
+    assert [r.dish_name for r in out] == ["Rice Pilaf"]
+    assert matcher.seen == [RICE]  # the sliver was never matched to a menu dish
+
+
 def test_percent_left_uses_the_reference_volume_when_there_is_one() -> None:
     (rice,) = _pipeline([FoodRegion(_box(10, 20, 10, 20), RICE, 0.9)], reference=40.0).run(
         IMAGE, "Dinner"
@@ -249,3 +272,24 @@ def test_bad_photos_are_rejected_and_nothing_is_stored(tmp_path: Path) -> None:
     assert wrong_meal.status_code == 422 and "not on today's menu" in wrong_meal.json()["detail"]
     with Session(app.state.db.engine) as session:
         assert session.exec(select(Plate)).all() == []
+
+
+def test_missing_menu_is_a_503_not_a_crash(tmp_path: Path) -> None:
+    from menu.importer import MenuUnavailableError
+
+    def no_menu(meal: str) -> FakeMatcher:
+        raise MenuUnavailableError("no API response, cache or manual file")
+
+    pipe = _pipeline([FoodRegion(_box(10, 20, 10, 20), RICE, 0.9)])
+    pipe.matcher_for = no_menu
+    _app, client = _client(tmp_path, pipe)
+    response = _post(client)
+    assert response.status_code == 503
+    assert "menu is unavailable" in response.json()["detail"]
+
+
+def test_menu_date_setting_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LEFTOVER_MENU_DATE", "2026-11-14")
+    assert Settings.from_env().menu_date == date(2026, 11, 14)
+    monkeypatch.setenv("LEFTOVER_MENU_DATE", "")
+    assert Settings.from_env().menu_date is None

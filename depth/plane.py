@@ -31,6 +31,35 @@ def fit_plane(depth_cm: DepthMap, plate: Mask) -> Plane:
     return float(coeffs[0]), float(coeffs[1]), float(coeffs[2])
 
 
+def fit_plane_robust(depth_cm: DepthMap, plate: Mask, keep: float = 0.8, rounds: int = 2) -> Plane:
+    """``fit_plane``, refit ``rounds`` times on the ``keep`` fraction of pixels closest to it.
+
+    Real depth (Depth Anything 3) puts false height on bare plate next to food (edge blur) and
+    on the raised rim; a plain least-squares fit is pulled toward those pixels, which lifts the
+    plane and under-counts food. Trimming the worst-fitting pixels removes that pull. On a
+    perfectly flat plate it returns the same plane as ``fit_plane``.
+
+    Raises:
+        ValueError: as ``fit_plane``, or ``keep`` outside (0, 1].
+    """
+    if not 0.0 < keep <= 1.0:
+        raise ValueError("keep must be in (0, 1]")
+    plane = fit_plane(depth_cm, plate)
+    ys, xs = np.nonzero(plate)
+    values = depth_cm[ys, xs].astype(np.float64)
+    for _ in range(rounds):
+        a, b, c = plane
+        residual = np.abs(a * xs + b * ys + c - values)
+        cut = float(np.quantile(residual, keep))
+        inliers = residual <= cut
+        if int(inliers.sum()) < 3:
+            break
+        sub = np.zeros(plate.shape, dtype=bool)
+        sub[ys[inliers], xs[inliers]] = True
+        plane = fit_plane(depth_cm, sub)
+    return plane
+
+
 def height_map(depth_cm: DepthMap, plane: Plane) -> NDArray[np.float64]:
     """Height of every pixel above the plate plane, in cm; below-plane values clip to 0.
 

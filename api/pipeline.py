@@ -28,6 +28,11 @@ from core.types import DishMatch, FoodCategory, FoodRegion, ImageBGR, Mask
 from depth.volume import PlateMeasurement
 from portion.grams import estimate_grams, percent_left
 
+MIN_REGION_ML = 2.0
+"""Regions measuring less than this are dropped before matching and storing. On real photos
+small false detections measure ~0 ml; kept, they would log a 0 g leftover for a dish that was
+never on the plate (a fries plate reported "Portobello Pot Roast", 0.0 ml)."""
+
 
 class Unmeasurable(Exception):
     """The frame cannot be measured honestly (no plate, plate clipped, no scale)."""
@@ -97,6 +102,8 @@ class PlatePipeline:
         out: list[RegionIn] = []
         for region, volume in zip(regions, measurement.volumes_ml, strict=True):
             volume = max(0.0, float(volume))
+            if volume < MIN_REGION_ML:
+                continue
             portion = estimate_grams(volume, region.category)
             match = matcher.match(image, region)
             reference = self.reference_volume(match.dish_name) if match.dish_name else None

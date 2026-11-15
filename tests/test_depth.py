@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 
+import cv2
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -15,7 +16,7 @@ from depth.estimator import (
     load_da3,
     to_centimetres,
 )
-from depth.plane import fit_plane, height_map, volume_ml
+from depth.plane import fit_plane, fit_plane_robust, height_map, volume_ml
 from depth.volume import (
     ellipse_mask,
     food_volume_ml,
@@ -162,6 +163,33 @@ def test_food_volumes_recovered_from_up_to_scale_depth(unknown_scale: float) -> 
     assert block_ml == pytest.approx(60.0, rel=0.02)
     assert mound_ml == pytest.approx(cap_volume(2.5, 2.0), rel=0.02)
     assert m.depth_scale * unknown_scale == pytest.approx(1.0, rel=0.005)
+
+
+def test_edge_halo_next_to_food_does_not_lift_the_plane() -> None:
+    """Depth Anything 3 blurs height onto bare plate beside food (seen on real Village photos).
+
+    A 1 cm false rise in a 10 px band round the block pulls a plane fitted right up to the
+    food upward and under-counts the block; leaving out the band next to the food
+    (``FOOD_MARGIN_FRACTION``, about 10 px on this plate) removes the bias.
+    """
+    depth, plate, foods = render()
+    halo = cv2.dilate(foods[0].astype(np.uint8), np.ones((21, 21), np.uint8)).astype(bool)
+    noisy = depth.copy()
+    noisy[halo & plate] -= 1.0
+    naive = volumes_from_depth(noisy, plate, foods, focal_px=F, food_margin_fraction=0.0)
+    fixed = volumes_from_depth(noisy, plate, foods, focal_px=F)
+    assert naive is not None and fixed is not None
+    assert naive.volumes_ml[0] < 0.97 * 60.0  # the flaw is real in this scene
+    assert fixed.volumes_ml[0] == pytest.approx(60.0, rel=0.01)
+
+
+def test_robust_plane_matches_least_squares_on_a_clean_tilted_plate() -> None:
+    ys, xs = np.indices((60, 80))
+    depth = (40.0 + 0.01 * xs - 0.02 * ys).astype(np.float32)
+    plate = np.ones(depth.shape, dtype=bool)
+    assert fit_plane_robust(depth, plate) == pytest.approx(fit_plane(depth, plate), abs=1e-6)
+    with pytest.raises(ValueError, match="keep"):
+        fit_plane_robust(depth, plate, keep=0.0)
 
 
 def test_perspective_footprint_matters_for_tall_food() -> None:

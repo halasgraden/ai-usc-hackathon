@@ -15,6 +15,7 @@ from sqlmodel import Session, col, func, select
 from api.models import Database, Plate, PlateEvent, round_to_quarter_hour
 from api.pipeline import PlatePipeline, Unmeasurable, decode_image
 from api.schemas import PlateAccepted, PlateImageAccepted, PlateIn
+from menu.importer import MenuUnavailableError
 
 
 def to_local_naive(moment: datetime, timezone: str) -> datetime:
@@ -151,6 +152,10 @@ def build_router(
             raise HTTPException(422, str(exc)) from exc
         except KeyError as exc:
             raise HTTPException(422, f"meal {meal!r} is not on today's menu") from exc
+        except MenuUnavailableError as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, f"today's menu is unavailable: {exc}"
+            ) from exc
         plate = PlateIn(
             plate_id=secrets.token_hex(8),
             meal=meal.strip(),
