@@ -1,13 +1,64 @@
 <!-- DATA PROVENANCE: Hackathon demo. Historical plates, serving quantities, costs and trends are simulated by api.seed; dish names use the USC Village menu catalog. These are not measured institutional outcomes. -->
-# Leftover Lens
+<p align="center"><img src="docs/assets/plateprint_logo.png" width="120" alt="Plateprint logo"></p>
 
-A camera over the dish return at USC Village Dining Hall that measures what
-comes back uneaten. Each plate becomes anonymous numbers (dish, grams, percent
-left) for a staff dashboard and a weekly report USG can publish. It stores
-plates, never people: no student app, no IDs, no faces.
+# Plateprint
 
-USC forecasts what to cook and composts what is left, but nothing measures
-plate waste per dish. This fills that gap.
+**Every plate leaves a print.** Feedback from what students eat, not what they say.
+
+Plateprint is a camera over the dish return at USC Village Dining Hall that measures
+what comes back uneaten. Each plate becomes anonymous numbers (dish, ml, grams) for a
+staff dashboard and a weekly report. It stores plates, never people: no student app,
+no IDs, no faces, and no frame is ever written to disk.
+
+> Formerly *Leftover Lens*. The code, Python packages and `LEFTOVER_*` environment
+> variables keep the old name so nothing breaks.
+
+## Why
+
+* U.S. college campuses throw out an estimated 22 million lb of food a year
+  ([Food Recovery Network, via Higher Ed Dive](https://www.highereddive.com/news/college-combat-food-waste/510987/)).
+* USC Dining collects feedback through QR codes on every table, but USC's associate
+  director for residential dining told the Daily Trojan that not many students submit
+  responses ([Daily Trojan, Mar. 2025](https://dailytrojan.com/2025/03/06/new-advisory-board-aims-to-include-student-perspectives/)).
+  The form asks broad 1-5 questions and never asks which dish
+  ([Daily Trojan, Oct. 2024](https://dailytrojan.com/2024/10/04/the-dining-hall-experience-could-be-improved-heres-how/)).
+* USC forecasts what to cook and composts what is left, but nothing measures plate waste
+  per dish. Plateprint fills that gap.
+* It works elsewhere: UGA cut food left on plates by 19% in one semester (about 15,000 lb)
+  with an AI plate-waste camera
+  ([UGA Auxiliary Services](https://auxiliary.uga.edu/raccoon-eyes-helps-dining-services-reduce-food-waste/)).
+  USC aims for STARS Platinum by 2028
+  ([Daily Trojan, Feb. 2024](https://dailytrojan.com/2024/02/26/usc-sustainability-ranking/)),
+  and dish-level waste data supports its food-waste and purchasing work.
+
+## The loop
+
+```
+plate returned -> camera measures leftovers -> waste by dish, every day -> menu & orders adjust -> better plates
+```
+
+## How it works
+
+| Stage | Module | What it does |
+| --- | --- | --- |
+| 1. Capture | `capture/` | One sharp frame per plate from a phone or camera over the dish return; the 8.5 in (21.59 cm) plate sets the scale; frames with a face are dropped; nothing is saved |
+| 2. Segment | `labeling/`, `vision/` | Grounding DINO + SAM 2.1 auto-label training masks offline; YOLO26n-seg (`village-v2`, trained on our Village photos) runs live through ONNX Runtime |
+| 3. Measure | `depth/`, `portion/` | Depth Anything 3 depth, scaled by the plate's known size; plate-plane fit; volume in ml; grams = volume x bulk density |
+| 4. Match | `menu/` | Imports today's Village menu; SigLIP 2 picks a region's dish from today's dishes in its category, or says "unknown" |
+| 5. Report | `analytics/`, `api/`, `dashboard/` | FastAPI + SQLite store; Next.js dashboard: waste by dish, ranges, filters, CSV, weekly PDF and committee email |
+
+Volume, with plate scale \(s = 21.59\,\text{cm} / d_\text{plate, px}\) and height
+\(h_p\) of each food pixel above the fitted plate plane:
+
+$$V \approx \sum_{p \in \text{food}} \max(0, h_p)\, s^2, \qquad m = \rho V$$
+
+## Privacy by design
+
+* Frames are processed in memory and never written to disk, on the rig or in the API.
+* A YuNet face guard checks every frame before upload and **fails closed**: if the face
+  model can't load, every plate is dropped.
+* No student identity is collected at any stage. The database holds plates, dishes and
+  numbers only.
 
 ## Run the dining dashboard
 
@@ -34,36 +85,63 @@ or email sending is claimed.
 [Dashboard setup, metric definitions, workflow research and judging walkthrough](dashboard/README.md)
 · [Verification evidence](docs/DASHBOARD_VERIFICATION.md)
 
-## How it works
+## Live end-to-end test (15 Nov 2026)
 
-| Stage | Module | What it does |
-| --- | --- | --- |
-| 1. Capture | `capture/` | One sharp frame per plate from a phone on a stand; the 8.5 in plate sets the scale; frames with a face are dropped |
-| 2. Segment | `labeling/`, `vision/` | Grounding DINO + SAM 2.1 auto-label training masks offline; a YOLO26n-seg model we train runs live through ONNX Runtime |
-| 3. Match | `menu/` | Imports today's Village menu; a region can only be one of today's dishes or "unknown" |
-| 4. Measure | `depth/`, `portion/` | Depth Anything 3 depth, scaled by the plate's known size; plate-plane fit, volume in ml; grams = volume x bulk density |
-| 5. Report | `analytics/`, `api/`, `dashboard/` | Per-dish waste, flags, staff dashboard, USG report |
+Real phone photos of Village plates, posted to the running API (`POST /plates/image`)
+on a Mac with `village-v2.onnx`, DA3-Small and SigLIP 2, against the 14 Nov Village menu
+(`LEFTOVER_MENU_DATE=2026-11-14`). Details and caveats: [docs/MEASUREMENT.md](docs/MEASUREMENT.md).
+
+| Plate | Matched dish | ml | g (unvalidated) |
+| --- | --- | ---: | ---: |
+| Rice | Rice Pilaf | 119.5 | 87.2 |
+| Fries | Assorted French Fries | 37.5 | 18.8 |
+| Chicken + asparagus (held-out plate) | Garlic and Herb Roasted Chicken | 99.6 | 58.8 |
+| | Roasted Lemon Zest Asparagus | 137.0 | 82.2 |
+| Rice + chicken | Rice Pilaf | 97.4 | 71.1 |
+| | Garlic and Herb Roasted Chicken | 66.8 | 39.4 |
+
+All 6 foods on 4 plates were matched to the right dish. This is a smoke test, not an
+evaluation: **grams have not been checked against a scale**, and volume moves one-for-one
+with the camera's focal length, which is uncalibrated (15-35% spread).
+
+## Demo with a phone
+
+The API and dashboard as in [Run the dining dashboard](#run-the-dining-dashboard), then either:
+
+* **Photo (simplest):** take an overhead photo of the plate (35-45 cm above, whole plate
+  in frame), AirDrop it to the Mac, then
+  ```bash
+  sips -s format jpeg -Z 1600 ~/Downloads/IMG_XXXX.HEIC --out plate.jpg
+  curl -s -H "Authorization: Bearer local-demo-device" -F image=@plate.jpg -F meal=Dinner \
+    http://127.0.0.1:8000/plates/image | python -m json.tool
+  ```
+* **Live rig:** iPhone as a Continuity Camera (locked, mounted screen up with the back
+  camera pointing down at the tray), then
+  ```bash
+  LEFTOVER_DEVICE_TOKEN=local-demo-device python -m capture --meal Dinner --source 0 \
+    --motion-threshold 6 --min-sharpness 20
+  ```
+  Give the terminal app camera access in System Settings, Privacy & Security, Camera.
+
+The food must be on the menu for `LEFTOVER_MENU_DATE`, or it comes back "unknown".
 
 ## Status
 
 | Module | State |
 | --- | --- |
 | `menu/` importer, cleaner, categorizer | Working, tested against a real Village menu |
-| `portion/` grams and percent left | Working, tested |
-| `depth/plane.py` plane fit, height map, volume | Working, tested on synthetic geometry |
-| `capture/scale.py` plate-ellipse scale; `depth/estimator.py`, `depth/volume.py` DA3 depth to ml | Working on synthetic geometry (see `docs/MEASUREMENT.md`); real DA3 not yet run |
-| `menu/matcher.py` SigLIP match to today's menu, `eval/matching.py` | Tested with a fake embedder; SigLIP not yet run, thresholds untuned |
-| `labeling/` Voxel51 converter, class map, mask geometry | Working; Voxel51 conversion run on the real dataset |
-| `labeling/autolabel.py` Grounding DINO + SAM 2.1 | Filtering, prompts, split and label export tested; model calls not yet run |
-| `augment/composite.py` paste and lighting augmentation | Working, tested on synthetic plates |
-| `augment/dataset.py` composites into the training split only | Working, tested |
-| `eval/segmentation.py` held-out per-class mask AP, written to `eval/results/` | Working, tested; first real run pending |
-| `vision/infer.py` ONNX decode, NMS, masks | Working, tested; checked on real photos with the Voxel51 baseline |
-| `vision/train.py`, `vision/export_onnx.py` | `village-v2` (1024 px) trained on our Village photos and shipped; `village-v1` (640 px) kept for comparison (`notebooks/colab_train_village.ipynb`) |
-| `capture/` source, plate trigger, YuNet face guard, rig loop `python -m capture` | Tested on synthetic frames and against the API with a fake pipeline; trigger thresholds untuned; face guard fails closed and the real YuNet model has not been run yet |
-| `api/` | All endpoints in `docs/CONTRACTS.md` work on SQLite; `POST /plates/image` runs segment, merge per class, depth to ml, grams, menu match (tested with fake models; needs the exported ONNX model, DA3 and SigLIP installed to run for real) |
-| `analytics/` per-dish aggregates, trends, high-waste flags; `python -m api.seed` demo data (labelled `seeded`) | Working, tested |
-| `dashboard/` | Working Next.js two-tab module using FastAPI; full menu, trends, serving comparisons, uncertainty, CSV and report export. See `dashboard/README.md`. |
+| `portion/` grams and percent left | Working, tested; grams not yet validated against a scale |
+| `depth/` plane fit, height map, volume, DA3 wrapper | Working; DA3-Small run on real Village photos (Colab and Mac); food-edge margin in the plane fit, trimmed refit off by default |
+| `capture/scale.py` plate-ellipse scale | Working on synthetic geometry and real photos (camera height 21-46 cm recovered) |
+| `menu/matcher.py` SigLIP 2 match to today's menu, `eval/matching.py` | Run on real photos: 6 of 6 foods matched in the live test; thresholds untuned |
+| `labeling/autolabel.py` Grounding DINO + SAM 2.1 | Run on all 85 Village photos in Colab; filtered, with missing-food and manual exclusion reports |
+| `augment/` copy-paste and lighting augmentation, composites into train only | Working, tested; 200 composites used for v1 and v2 |
+| `eval/segmentation.py`, `eval/compare.py` | Working; real results committed in `eval/results/` |
+| `vision/` train, ONNX export, inference | `village-v2` (1024 px) trained and shipped; `village-v1` (640 px) kept for comparison |
+| `capture/` source, plate trigger, YuNet face guard, rig loop `python -m capture` | Tested on synthetic frames and against the API; iPhone Continuity Camera opens; trigger thresholds untuned |
+| `api/` | All endpoints in `docs/CONTRACTS.md` work on SQLite; `POST /plates/image` runs the full pipeline on real photos; regions under 2 ml dropped; `LEFTOVER_MENU_DATE` replays a past menu for demos |
+| `analytics/`, `python -m api.seed` demo data (labelled `seeded`) | Working, tested |
+| `dashboard/` | Working Next.js two-tab module on FastAPI. See `dashboard/README.md`. |
 | Grams eval (needs weighed plates) | Not measured yet. |
 
 ## Results
@@ -116,7 +194,21 @@ How to read it:
   numbers are likely somewhat optimistic.
 * Rice, burger, short ribs and crepe were photographed at only one sitting each, so they have
   no held-out score at all.
-* Not measured yet: grams (no weighed plates), menu matching, and the end-to-end pipeline.
+* Not measured yet by an eval script: grams (no weighed plates) and menu-matching accuracy.
+  See [Live end-to-end test](#live-end-to-end-test-15-nov-2026) for the first real run.
+
+## Limitations and next steps
+
+* **Validate grams** by weighing a set of plates, then calibrate densities.
+* **Calibrate the rig camera's focal length** once; volume scales with it.
+* Small dataset (85 photos): rice, burger, short ribs and crepe have no held-out score,
+  and stacked fries are measured on their top layer only.
+* The same rice photo gives 137 ml on Colab and 119 ml on a Mac; not explained yet.
+* A one-week pilot at USC Village with USC Hospitality, compared against their own waste
+  audits. The USC Hospitality logo in the dashboard needs their approval before any
+  public deployment.
+* Licensing: Ultralytics YOLO is AGPL-3.0; see [MODEL_CARD.md](MODEL_CARD.md).
+* Cost and CO2e factors in the dashboard are placeholders.
 
 ## Run it
 
@@ -134,7 +226,7 @@ ruff check . && ruff format --check . && mypy . && pytest
 
 Or `docker compose up --build` for the API on port 8000.
 
-The rig (phone over the dish return, posting each plate to the API):
+The rig (phone or camera over the dish return, posting each plate to the API):
 
 ```bash
 pip install -e ".[dev,vision]"
