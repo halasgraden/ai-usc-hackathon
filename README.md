@@ -1,3 +1,4 @@
+<!-- DATA PROVENANCE: Hackathon demo. Historical plates, serving quantities, costs and trends are simulated by api.seed; dish names use the USC Village menu catalog. These are not measured institutional outcomes. -->
 # Leftover Lens
 
 A camera over the dish return at USC Village Dining Hall that measures what
@@ -32,8 +33,6 @@ or email sending is claimed.
 
 [Dashboard setup, metric definitions, workflow research and judging walkthrough](dashboard/README.md)
 · [Verification evidence](docs/DASHBOARD_VERIFICATION.md)
-
-![Full-menu dining dashboard](dashboard/public/evidence/desktop.png)
 
 ## How it works
 

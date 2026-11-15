@@ -633,6 +633,11 @@ export interface components {
       data_source: "live" | "seeded";
       /** Weeks */
       weeks: components["schemas"]["TrendPoint"][];
+      /**
+       * Daily
+       * @description Daily totals; week_start holds the observation date in this series.
+       */
+      daily?: components["schemas"]["TrendPoint"][];
       /** Start */
       start?: string | null;
       /** End */

@@ -33,7 +33,7 @@ The frontend always calls FastAPI. API failures are displayed, never replaced wi
 
 ## Judge walkthrough (under three minutes)
 
-1. Select **4 weeks**. Explore all 37 dots and rows; the largest masses emerge from the sorted table. Switch to **Compare with servings** and inspect uncertainty.
+1. Select **4 weeks**. Explore all 37 ranked bars and rows; the largest masses emerge from the sorted table. Switch to **Compare with servings** and inspect uncertainty.
 2. Search **Rice**. Select **Rice Pilaf**. Inspect grams, return share, and the separately explained reference-portion index.
 3. Optionally record a dated portion-change note. It persists only in this browser, annotates trends, and never changes measurements.
 4. Close the panel, clear the search, and switch to **Trends**. Compare mass with return share and inspect the full dish-by-week matrix. Missing periods are not filled with zero.
@@ -117,3 +117,7 @@ See [verification notes](../docs/DASHBOARD_VERIFICATION.md) for actual results a
 - [USC colors](https://identity.usc.edu/identity/color/) and [typography](https://identity.usc.edu/identity/typography/): cardinal/gold branding and Source Sans 3 digital substitute.
 
 Research accessed November 15, 2026. Proposed pilot success measures: returned kg per meal, matched return share with validated serving coverage, manager review time, and actual workflow adoption. No environmental or procurement savings have been measured by this demo.
+
+Display units: all dashboard weights, uncertainty bounds, CSV exports, email previews, and printable reports use pounds. API/storage units remain kilograms and grams; presentation converts using 1 lb = 0.45359237 kg. Menu charts rank every eligible dish by returned weight or returned share.
+
+Demo uncertainty: seeded records use an assumed ±5% mass range for presentation. This is not a validation result. Live CV records retain their original density-based bounds.

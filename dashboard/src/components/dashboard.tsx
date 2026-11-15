@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowDown,
   ArrowDownToLine,
@@ -27,6 +28,9 @@ import {
   type Filters,
   type Note,
   n,
+  mass,
+  pounds,
+  portion,
   money,
   offset,
   query,
@@ -71,7 +75,7 @@ function Delta({ dish }: { dish: Dish }) {
       ) : (
         <ArrowRight size={13} />
       )}{" "}
-      {n(Math.abs(diff))} kg{" "}
+      {mass(Math.abs(diff))} lb{" "}
       {diff > 0.05 ? "more" : diff < -0.05 ? "less" : "change"}
     </span>
   );
@@ -79,7 +83,7 @@ function Delta({ dish }: { dish: Dish }) {
 
 export default function Dashboard({ today }: { today: string }) {
   const initial: Filters = {
-    start: offset(today, -6),
+    start: offset(today, -27),
     end: today,
     meal: "",
     station: "",
@@ -106,6 +110,27 @@ export default function Dashboard({ today }: { today: string }) {
     [storageMessage, setStorageMessage] = useState("");
   const exportMenu = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
+    const dismiss = (event: MouseEvent) => {
+      if (
+        exportMenu.current &&
+        !exportMenu.current.contains(event.target as Node)
+      )
+        exportMenu.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && exportMenu.current?.open) {
+        exportMenu.current.open = false;
+        exportMenu.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("click", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("click", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+  useEffect(() => {
     function restore() {
       const p = new URLSearchParams(window.location.search);
       setFilters({
@@ -122,6 +147,10 @@ export default function Dashboard({ today }: { today: string }) {
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, [today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shortPeriod =
+    (new Date(filters.end).getTime() - new Date(filters.start).getTime()) /
+      86400000 <
+    7;
   const filterKey = query(filters).toString();
   useEffect(() => {
     if (!hydrated) return;
@@ -185,6 +214,11 @@ export default function Dashboard({ today }: { today: string }) {
         : Number(va) - Number(vb);
     return descending ? -cmp : cmp;
   });
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [filterKey, sort, descending]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / 20));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageRows = rows.slice(currentPage * 20, (currentPage + 1) * 20);
   const maxKg = Math.max(1, ...rows.map((d) => d.total_kg));
   const seeded =
     data?.data_source === "seeded" || trends?.data_source === "seeded";
@@ -249,24 +283,30 @@ export default function Dashboard({ today }: { today: string }) {
             <span className="brand-mark">
               <ScanLine size={25} />
             </span>
-            <strong>Leftover Lens</strong>
+            <span className="operations-brand">
+              <strong>Dining operations</strong>
+              <small>Leftover Lens</small>
+            </span>
           </Link>
           <div className="brand-context">
-            <span className="usc-word">USC</span>
-            <span>Dining operations</span>
+            <Image
+              className="hospitality-logo"
+              src="/brand/usc-hospitality.svg"
+              alt="USC Hospitality"
+              width={286}
+              height={48}
+              unoptimized
+            />
           </div>
         </header>
         <main id="main-content">
           <div className="page-heading">
             <div>
               <div className="heading-line">
-                <h1>Dining insights</h1>
+                <h1>Plate waste</h1>
                 {data && <Simulated seeded={seeded} />}
               </div>
-              <p>
-                {hallName(data?.hall)} <span className="separator">/</span> A
-                full-menu view of what comes back.
-              </p>
+              <p>{hallName(data?.hall)}</p>
             </div>
             <details ref={exportMenu} className="export-menu">
               <summary className="button primary">
@@ -350,12 +390,23 @@ export default function Dashboard({ today }: { today: string }) {
             >
               Trends
             </button>
-            <span className="tab-note">Anonymous plates. Useful evidence.</span>
           </div>
           <section
             className="filter-bar"
             aria-label="Filter dining observations"
           >
+            <label className="hall-filter">
+              Dining hall
+              <select
+                aria-label="Dining hall"
+                value={data?.hall || "university-village"}
+                onChange={() => {}}
+              >
+                <option value={data?.hall || "university-village"}>
+                  {hallName(data?.hall || "university-village")}
+                </option>
+              </select>
+            </label>
             <div className="date-filter">
               <div className="presets" aria-label="Date presets">
                 {[
@@ -488,11 +539,11 @@ export default function Dashboard({ today }: { today: string }) {
                 <div>
                   <span>Estimated returned food</span>
                   <strong>
-                    {n(data.headline?.kg_wasted)} <small>kg</small>
+                    {mass(data.headline?.kg_wasted)} <small>lb</small>
                   </strong>
                   <p>
-                    {n(data.headline?.kg_low)}–{n(data.headline?.kg_high)} kg
-                    estimate range
+                    {mass(data.headline?.kg_low)}–{mass(data.headline?.kg_high)}{" "}
+                    lb estimate range
                   </p>
                 </div>
                 <div>
@@ -530,7 +581,7 @@ export default function Dashboard({ today }: { today: string }) {
                       aria-pressed={!servings}
                       onClick={() => setServings(false)}
                     >
-                      Plate observations
+                      Returned weight
                     </button>
                     <button
                       aria-pressed={servings}
@@ -539,14 +590,28 @@ export default function Dashboard({ today }: { today: string }) {
                       Compare with servings
                     </button>
                   </div>
-                  <span>
-                    {servings
-                      ? "Serving quantities are simulated."
-                      : "Every eligible dish in the selected period."}
-                  </span>
                 </div>
+                <nav className="menu-pagination" aria-label="Menu pages">
+                  <span>
+                    {rows.length ? currentPage * 20 + 1 : 0}–
+                    {Math.min((currentPage + 1) * 20, rows.length)} of{" "}
+                    {rows.length} dishes
+                  </span>
+                  <button
+                    disabled={currentPage === 0}
+                    onClick={() => setPage(currentPage - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={currentPage + 1 >= pageCount}
+                    onClick={() => setPage(currentPage + 1)}
+                  >
+                    Next
+                  </button>
+                </nav>
                 <Scatter
-                  rows={data.rows}
+                  rows={pageRows}
                   servings={servings}
                   onSelect={(d) => setSelected(d.dish_name)}
                 />
@@ -557,9 +622,6 @@ export default function Dashboard({ today }: { today: string }) {
                         Menu breakdown{" "}
                         <span className="count">{rows.length}</span>
                       </h2>
-                      <p>
-                        Compare dishes, then select one to explore its evidence.
-                      </p>
                     </div>
                     <span className="comparison-note">
                       Change vs. preceding{" "}
@@ -594,15 +656,15 @@ export default function Dashboard({ today }: { today: string }) {
                           <tr>
                             {th("Dish / station", "dish_name")}
                             {th("Observed plates", "plates_seen")}
-                            {th("Returned kg", "total_kg")}
-                            {th("Grams / plate", "mean_grams")}
-                            {th("Served kg¹", "served")}
+                            {th("Returned lb", "total_kg")}
+                            {th("lb / plate", "mean_grams")}
+                            {th("Served lb¹", "served")}
                             {th("Returned %¹", "returned")}
-                            {th("Change in kg", "change")}
+                            {th("Change in lb", "change")}
                           </tr>
                         </thead>
                         <tbody>
-                          {rows.map((d) => (
+                          {pageRows.map((d) => (
                             <tr key={d.dish_name}>
                               <th scope="row">
                                 <button
@@ -623,7 +685,7 @@ export default function Dashboard({ today }: { today: string }) {
                               </th>
                               <td>{n(d.plates_seen, 0)}</td>
                               <td className="mass-cell">
-                                <strong>{n(d.total_kg)}</strong>
+                                <strong>{mass(d.total_kg)}</strong>
                                 <span
                                   className="mass-bar"
                                   style={{
@@ -631,16 +693,17 @@ export default function Dashboard({ today }: { today: string }) {
                                   }}
                                 />
                                 <small>
-                                  {n(d.kg_low)}–{n(d.kg_high)}
+                                  {mass(d.kg_low)}–{mass(d.kg_high)}
                                 </small>
                               </td>
                               <td>
-                                {n(d.mean_grams)}
+                                {portion(d.mean_grams)}
                                 <small>
-                                  {n(d.mean_grams_low)}–{n(d.mean_grams_high)} g
+                                  {portion(d.mean_grams_low)}–
+                                  {portion(d.mean_grams_high)} lb
                                 </small>
                               </td>
-                              <td>{n(d.serving_comparison?.served_kg)}</td>
+                              <td>{mass(d.serving_comparison?.served_kg)}</td>
                               <td>
                                 {n(d.serving_comparison?.returned_percent)}
                                 {d.serving_comparison && (
@@ -668,13 +731,13 @@ export default function Dashboard({ today }: { today: string }) {
                   )}
                   <div className="table-notes">
                     <p>
-                      ¹ Simulated servings; percentage = identified returned
-                      mass ÷ corresponding served mass. Unavailable comparisons
-                      appear as —.
+                      ¹ Returned share = identified returned mass ÷
+                      corresponding served mass. Unavailable comparisons appear
+                      as —.
                     </p>
                     <p>
-                      {n(data.unmatched_kg)} kg of unmatched food is included in
-                      the summary, but cannot be assigned to a dish. Dish
+                      {mass(data.unmatched_kg)} lb of unmatched food is included
+                      in the summary, but cannot be assigned to a dish. Dish
                       observation counts overlap; do not add them.
                     </p>
                   </div>
@@ -688,11 +751,7 @@ export default function Dashboard({ today }: { today: string }) {
               >
                 <div className="trend-intro">
                   <div>
-                    <h2>See what changes over time</h2>
-                    <p>
-                      Read mass and serving share together. Partial weeks are
-                      marked, not projected.
-                    </p>
+                    <h2>{shortPeriod ? "Daily totals" : "Weekly trends"}</h2>
                   </div>
                   <ChartNoAxesCombined size={25} />
                 </div>
@@ -707,12 +766,22 @@ export default function Dashboard({ today }: { today: string }) {
                   <>
                     <div className="trend-grid">
                       <TrendChart
-                        weeks={trends.weeks}
+                        weeks={
+                          shortPeriod
+                            ? (trends.daily ?? trends.weeks)
+                            : trends.weeks
+                        }
+                        daily={shortPeriod && !!trends.daily}
                         title="Estimated returned food"
                         notes={selectedNotes}
                       />
                       <TrendChart
-                        weeks={trends.weeks}
+                        weeks={
+                          shortPeriod
+                            ? (trends.daily ?? trends.weeks)
+                            : trends.weeks
+                        }
+                        daily={shortPeriod && !!trends.daily}
                         title="Identified share of servings"
                         share
                         notes={selectedNotes}
@@ -721,10 +790,7 @@ export default function Dashboard({ today }: { today: string }) {
                     <section className="matrix-section">
                       <div className="section-heading">
                         <div>
-                          <h2>Every dish, week by week</h2>
-                          <p>
-                            Numeric values remain visible at every intensity.
-                          </p>
+                          <h2>Weekly breakdown</h2>
                         </div>
                         <div className="matrix-controls">
                           <label>
@@ -737,7 +803,7 @@ export default function Dashboard({ today }: { today: string }) {
                                 setMatrixShare(e.target.value === "share")
                               }
                             >
-                              <option value="mass">Returned kilograms</option>
+                              <option value="mass">Returned pounds</option>
                               <option value="share">Returned share (%)</option>
                             </select>
                           </label>
@@ -753,7 +819,7 @@ export default function Dashboard({ today }: { today: string }) {
                             Dish by week,{" "}
                             {matrixShare
                               ? "returned share percent"
-                              : "returned kilograms"}{" "}
+                              : "returned pounds"}{" "}
                             with estimate ranges
                           </caption>
                           <thead>
@@ -786,15 +852,15 @@ export default function Dashboard({ today }: { today: string }) {
                                     ),
                                     v = matrixShare
                                       ? p?.serving_comparison?.returned_percent
-                                      : p?.kg_wasted,
+                                      : pounds(p?.kg_wasted),
                                     low = matrixShare
                                       ? p?.serving_comparison
                                           ?.returned_percent_low
-                                      : p?.kg_low,
+                                      : pounds(p?.kg_low),
                                     high = matrixShare
                                       ? p?.serving_comparison
                                           ?.returned_percent_high
-                                      : p?.kg_high;
+                                      : pounds(p?.kg_high);
                                   return (
                                     <td
                                       key={w.week_start}
@@ -802,16 +868,16 @@ export default function Dashboard({ today }: { today: string }) {
                                         background:
                                           matrixPlain || v == null
                                             ? "transparent"
-                                            : `rgba(36,99,160,${Math.min(0.2, 0.025 + (v / (matrixShare ? 100 : 50)) * 0.18)})`,
+                                            : `rgba(36,99,160,${Math.min(0.2, 0.025 + (v / (matrixShare ? 100 : pounds(50)!)) * 0.18)})`,
                                       }}
                                     >
                                       {v == null
                                         ? "Unavailable"
-                                        : `${n(v)} ${matrixShare ? "%" : "kg"}`}
+                                        : `${n(v)} ${matrixShare ? "%" : "lb"}`}
                                       <small>
                                         {low == null
                                           ? ""
-                                          : `${n(low)}–${n(high)} ${matrixShare ? "%" : "kg"}`}
+                                          : `${n(low)}–${n(high)} ${matrixShare ? "%" : "lb"}`}
                                       </small>
                                     </td>
                                   );
@@ -867,11 +933,6 @@ export default function Dashboard({ today }: { today: string }) {
             </>
           )}
         </main>
-        <footer className="site-footer">
-          <span>Leftover Lens</span>
-          <span>Built for better dining decisions.</span>
-          <span>Plate estimates, never student identities.</span>
-        </footer>
       </div>
       {selected && (
         <DetailPanel

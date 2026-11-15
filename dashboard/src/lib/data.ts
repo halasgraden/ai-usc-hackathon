@@ -79,18 +79,18 @@ export function csvText(data: Dishes): string {
     "Dish",
     "Station",
     "Observed plates",
-    "Returned kg",
-    "Returned kg low",
-    "Returned kg high",
-    "Mean leftover g",
-    "Mean leftover g low",
-    "Mean leftover g high",
-    "Simulated served kg",
+    "Returned lb",
+    "Returned lb low",
+    "Returned lb high",
+    "Mean leftover lb",
+    "Mean leftover lb low",
+    "Mean leftover lb high",
+    "Simulated served lb",
     "Servings",
     "Identified returned %",
     "Returned % low",
     "Returned % high",
-    "Previous returned kg",
+    "Previous returned lb",
     "Reference portion index %",
     "Data source",
     "Hall",
@@ -106,18 +106,18 @@ export function csvText(data: Dishes): string {
     d.dish_name,
     d.station,
     d.plates_seen,
-    d.total_kg,
-    d.kg_low,
-    d.kg_high,
-    d.mean_grams,
-    d.mean_grams_low,
-    d.mean_grams_high,
-    d.serving_comparison?.served_kg,
+    pounds(d.total_kg),
+    pounds(d.kg_low),
+    pounds(d.kg_high),
+    d.mean_grams == null ? null : d.mean_grams / 453.59237,
+    d.mean_grams_low == null ? null : d.mean_grams_low / 453.59237,
+    d.mean_grams_high == null ? null : d.mean_grams_high / 453.59237,
+    pounds(d.serving_comparison?.served_kg),
     d.serving_comparison?.servings,
     d.serving_comparison?.returned_percent,
     d.serving_comparison?.returned_percent_low,
     d.serving_comparison?.returned_percent_high,
-    d.previous_total_kg,
+    pounds(d.previous_total_kg),
     d.mean_percent_left,
     data.data_source,
     data.hall,
@@ -148,5 +148,15 @@ export const hallName = (hall?: string) =>
       : hall.replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export const costAssumption = (text?: string) =>
-  text?.split("; set ")[0] ||
-  "Ingredient cost uses an assumed per-kilogram factor.";
+  (
+    text?.split("; set ")[0] || "Ingredient cost uses an assumed factor."
+  ).replace(
+    /([0-9]+(?:\.[0-9]+)?)\s*USD(?:\/kg| per kg)/g,
+    (_, value) => `${n(Number(value) / 2.20462262185, 2)} USD/lb`,
+  );
+
+export const pounds = (kg: number | null | undefined) =>
+  kg == null ? null : kg * 2.20462262185;
+export const mass = (kg: number | null | undefined) => n(pounds(kg));
+export const portion = (grams: number | null | undefined) =>
+  n(grams == null ? null : grams / 453.59237, 3);

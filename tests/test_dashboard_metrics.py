@@ -133,3 +133,17 @@ def test_partial_windows_and_empty_periods(demo: tuple[TestClient, Database]) ->
     assert empty["weeks"] == []
     assert empty["dishes"] == []
     assert empty["data_source"] == "seeded"
+
+
+def test_daily_totals_reconcile_with_week(demo):
+    client, _ = demo
+    data = client.get("/dashboard/trends?start=2026-11-02&end=2026-11-08", headers=STAFF).json()
+    assert len(data["daily"]) == 7
+    for field in ("kg_wasted", "kg_low", "kg_high"):
+        assert sum(d[field] for d in data["daily"]) == pytest.approx(
+            data["weeks"][0][field], abs=0.001
+        )
+    day = client.get("/dashboard/trends?start=2026-11-02&end=2026-11-02", headers=STAFF).json()
+    assert len(day["daily"]) == 1
+    assert day["daily"][0]["week_start"] == "2026-11-02"
+    assert day["daily"][0]["partial"] is False

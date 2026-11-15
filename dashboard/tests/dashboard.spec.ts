@@ -7,21 +7,24 @@ test("full menu, linked detail, keyboard tabs, URL and exports", async ({
   page,
 }) => {
   await page.goto(url);
-  await expect(page.locator(".menu-table tbody tr")).toHaveCount(37);
+  await expect(page.locator(".menu-table tbody tr")).toHaveCount(20);
   await expect(
-    page.getByText("Simulated data", { exact: true }).first(),
+    page.getByText("Demo data", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.locator(".plot-point")).toHaveCount(37);
+  await expect(page.locator(".ranking-row")).toHaveCount(20);
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.locator(".menu-table tbody tr")).toHaveCount(17);
+  await page.getByRole("button", { name: "Previous", exact: true }).click();
   await page
     .getByRole("button", { name: "Compare with servings", exact: true })
     .click();
-  await expect(page.locator(".plot-point")).toHaveCount(37);
+  await expect(page.locator(".ranking-row")).toHaveCount(20);
   await page
     .getByRole("button", { name: "View as table", exact: true })
     .first()
     .click();
   await expect(
-    page.getByRole("columnheader", { name: "Simulated food served (kg)" }),
+    page.getByRole("columnheader", { name: "Returned (%)" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "View as chart", exact: true })
@@ -67,7 +70,7 @@ test("full menu, linked detail, keyboard tabs, URL and exports", async ({
     .click();
   const file = await download;
   const content = await fs.readFile((await file.path())!, "utf8");
-  expect(content).toContain("Returned kg low");
+  expect(content).toContain("Returned lb low");
   expect(content).toContain("Rice Pilaf");
   expect(content.split("\r\n")).toHaveLength(38);
   await page.locator(".export-menu summary").click();
@@ -103,7 +106,7 @@ test("API failure is explicit and never replaced by fictional frontend data", as
   );
   await page.goto(url);
   await expect(page.locator(".error-box")).toContainText("unavailable");
-  await expect(page.locator(".plot-point")).toHaveCount(0);
+  await expect(page.locator(".ranking-row")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Retry", exact: true }),
   ).toBeVisible();
@@ -119,7 +122,7 @@ test("desktop and tablet accessibility and evidence captures", async ({
   ] as const) {
     await page.setViewportSize({ width, height });
     await page.goto(url);
-    await expect(page.locator(".menu-table tbody tr")).toHaveCount(37);
+    await expect(page.locator(".menu-table tbody tr")).toHaveCount(20);
     await page.evaluate(() => document.fonts.ready);
     expect(
       await page.evaluate(
@@ -191,7 +194,7 @@ test("report modal remains named during loading and failure", async ({
   page,
 }) => {
   await page.goto(url);
-  await expect(page.locator(".menu-table tbody tr")).toHaveCount(37);
+  await expect(page.locator(".menu-table tbody tr")).toHaveCount(20);
   await page.route("**/api/backend/report/**", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
     await route.fulfill({
@@ -224,7 +227,7 @@ test("narrow reflow, zoom equivalent and reduced motion", async ({ page }) => {
   for (const width of [640, 320]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(url);
-    await expect(page.locator(".menu-table tbody tr")).toHaveCount(37);
+    await expect(page.locator(".menu-table tbody tr")).toHaveCount(20);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,

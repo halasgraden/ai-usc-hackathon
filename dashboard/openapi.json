@@ -1808,6 +1808,14 @@
             "type": "array",
             "title": "Weeks"
           },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "type": "array",
+            "title": "Daily",
+            "description": "Daily totals; week_start holds the observation date in this series."
+          },
           "start": {
             "anyOf": [
               {

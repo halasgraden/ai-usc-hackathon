@@ -272,6 +272,7 @@ def build_router(
                 start=first,
                 end=last,
                 weeks=metrics.weekly(events, servings, first, last, today()),
+                daily=metrics.weekly(events, servings, first, last, today(), daily=True),
                 dishes=[
                     DishWeeks(
                         dish_name=name,

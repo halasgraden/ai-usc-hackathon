@@ -127,13 +127,16 @@ def weekly(
     start: date,
     end: date,
     today: date,
+    daily: bool = False,
 ) -> list[TrendPoint]:
     groups: dict[date, list[PlateEvent]] = {}
     served_groups: dict[date, list[ServingRecord]] = {}
     for event in events:
-        groups.setdefault(week_start(event.observed_at.date()), []).append(event)
+        groups.setdefault(
+            event.observed_at.date() if daily else week_start(event.observed_at.date()), []
+        ).append(event)
     for record in servings:
-        key = week_start(record.day)
+        key = record.day if daily else week_start(record.day)
         served_groups.setdefault(key, []).append(record)
         groups.setdefault(key, [])
     result = []
@@ -148,7 +151,7 @@ def weekly(
                 serving_comparison=h.serving_comparison,
                 waste_rate_percent=h.waste_rate_percent,
                 partial=day < start
-                or day + timedelta(days=6) > min(end, today - timedelta(days=1)),
+                or day + timedelta(days=0 if daily else 6) > min(end, today - timedelta(days=1)),
             )
         )
     return result

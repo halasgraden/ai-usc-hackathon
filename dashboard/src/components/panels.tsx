@@ -18,6 +18,8 @@ import {
   type Report,
   money,
   n,
+  mass,
+  portion,
   shortDate,
   query,
   monday,
@@ -25,12 +27,16 @@ import {
   hallName,
   costAssumption,
 } from "@/lib/data";
+import { reportEmailHtml, procurementActions } from "@/lib/email-report";
 import { TrendChart } from "./charts";
 
 export function Simulated({ seeded }: { seeded: boolean }) {
   return seeded ? (
-    <span className="badge">
-      <FlaskConical size={13} /> Simulated data
+    <span
+      className="badge"
+      title="Simulated plate history and serving quantities; real menu dish names."
+    >
+      <FlaskConical size={13} /> Demo data
     </span>
   ) : (
     <span className="badge live">Plate observations</span>
@@ -156,7 +162,7 @@ export function DetailPanel({
         <p className="muted">
           {d?.station} · {shortDate(filters.start)}–{shortDate(filters.end)}
         </p>
-        {data && <Simulated seeded={data.data_source === "seeded"} />}
+
         {error ? (
           <ErrorBox message={error} retry={retry} />
         ) : !d ? (
@@ -167,16 +173,16 @@ export function DetailPanel({
               <div>
                 <span>Estimated returned</span>
                 <strong>
-                  {n(d.total_kg)} <small>kg</small>
+                  {mass(d.total_kg)} <small>lb</small>
                 </strong>
                 <span>
-                  {n(d.kg_low)}–{n(d.kg_high)} kg estimate range
+                  {mass(d.kg_low)}–{mass(d.kg_high)} lb estimate range
                 </span>
               </div>
               <div>
                 <span>Left per observed plate</span>
                 <strong>
-                  {n(d.mean_grams)} <small>g</small>
+                  {portion(d.mean_grams)} <small>lb</small>
                 </strong>
                 <span>
                   {n(d.plates_seen, 0)} plates with this dish detected
@@ -187,7 +193,7 @@ export function DetailPanel({
               <h3>How to read this dish</h3>
               <p>
                 {d.serving_comparison
-                  ? `${n(d.serving_comparison.returned_percent)}% of the simulated served mass was identified on returned plates (${n(d.serving_comparison.returned_percent_low)}–${n(d.serving_comparison.returned_percent_high)}%). The denominator is ${n(d.serving_comparison.served_kg)} kg across ${n(d.serving_comparison.servings, 0)} simulated servings.`
+                  ? `${n(d.serving_comparison.returned_percent)}% of the simulated served mass was identified on returned plates (${n(d.serving_comparison.returned_percent_low)}–${n(d.serving_comparison.returned_percent_high)}%). The denominator is ${mass(d.serving_comparison.served_kg)} lb across ${n(d.serving_comparison.servings, 0)} simulated servings.`
                   : "Serving comparison unavailable: there is no compatible, complete serving record for this observation population."}
               </p>
               <p>
@@ -331,11 +337,22 @@ export function ReportPanel({
   const params = query({ ...filters, start: "", end: "" });
   params.set("week_start", week);
   const { data, error, retry } = useData<Report>(`report/weekly?${params}`);
+  const previousParams = new URLSearchParams(params);
+  previousParams.set("week_start", offset(week, -7));
+  const { data: previousReport } = useData<Report>(
+    `report/weekly?${previousParams}`,
+  );
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
   const emailText = data
-    ? `Subject: Leftover Lens — dining report, ${shortDate(data.week_start)}–${shortDate(data.week_end!)}\n\n${data.data_source === "seeded" ? "SIMULATED DATA — demo quantities, not measured results.\n\n" : ""}${hallName(data.hall)}\n${filters.meal || "All meals"} · ${filters.station || "All stations"}${filters.search ? ` · Search: ${filters.search}` : ""}\n\nEstimated returned food: ${n(data.headline.kg_wasted)} kg (${n(data.headline.kg_low)}–${n(data.headline.kg_high)} kg).\nObserved plates: ${n(data.plates_seen, 0)}.\nEstimated ingredient cost: ${money(data.headline.est_cost_usd)} (assumed factor).\n\nLargest returned quantities:\n${data.top_dishes.map((d) => `• ${d.dish_name}: ${n(d.total_kg)} kg`).join("\n")}\n\n${data.headline.serving_comparison ? `Identified returns / simulated servings: ${n(data.headline.serving_comparison.returned_percent)}%. Unmatched food is excluded from this percentage.\n\n` : ""}Please review the attached report before changing production or recipes. These observations do not establish student preference or prove the effect of an intervention.\n\n${costAssumption(data.assumptions.cost_usd_per_kg)}\n\nPrepared by Leftover Lens. Email preview only; nothing has been sent.`
+    ? `Subject: Leftover Lens — dining report, ${shortDate(data.week_start)}–${shortDate(data.week_end!)}\n\n${data.data_source === "seeded" ? "SIMULATED DATA — demo quantities, not measured results.\n\n" : ""}${hallName(data.hall)}\n${filters.meal || "All meals"} · ${filters.station || "All stations"}${filters.search ? ` · Search: ${filters.search}` : ""}\n\nEstimated returned food: ${mass(data.headline.kg_wasted)} lb (${mass(data.headline.kg_low)}–${mass(data.headline.kg_high)} lb).\nObserved plates: ${n(data.plates_seen, 0)}.\nEstimated ingredient cost: ${money(data.headline.est_cost_usd)} (assumed factor).\n\nLargest returned quantities:\n${data.top_dishes.map((d) => `• ${d.dish_name}: ${mass(d.total_kg)} lb`).join("\n")}\n\n${data.headline.serving_comparison ? `Identified returns / simulated servings: ${n(data.headline.serving_comparison.returned_percent)}%. Unmatched food is excluded from this percentage.\n\n` : ""}Please review the attached report before changing production or recipes. These observations do not establish student preference or prove the effect of an intervention.\n\n${costAssumption(data.assumptions.cost_usd_per_kg)}\n\nProcurement recommendations:\n${procurementActions(
+        data,
+      )
+        .map((action) => `• ${action}`)
+        .join(
+          "\n",
+        )}\n\nPrepared by Leftover Lens. Email preview only; nothing has been sent.`
     : "";
   return (
     <dialog
@@ -399,6 +416,12 @@ export function ReportPanel({
                   <Copy size={16} /> Copy text
                 </button>
               </div>
+              <iframe
+                title="Formatted weekly email"
+                srcDoc={reportEmailHtml(data, previousReport)}
+                sandbox=""
+                style={{ width: "100%", height: 1100, border: 0 }}
+              />
               <label className="sr-only" htmlFor="email-text">
                 Email draft
               </label>
@@ -408,7 +431,7 @@ export function ReportPanel({
               </p>
             </section>
           )}
-          <article id="weekly-report">
+          <article id="weekly-report" hidden={email}>
             <div className="report-brand">
               Leftover Lens <span>USC dining operations</span>
             </div>
@@ -426,10 +449,10 @@ export function ReportPanel({
             </p>
             <div className="report-summary">
               <div>
-                <strong>{n(data.headline.kg_wasted)} kg</strong>
+                <strong>{mass(data.headline.kg_wasted)} lb</strong>
                 <span>Estimated returned food</span>
                 <small>
-                  {n(data.headline.kg_low)}–{n(data.headline.kg_high)} kg
+                  {mass(data.headline.kg_low)}–{mass(data.headline.kg_high)} lb
                 </small>
               </div>
               <div>
@@ -447,8 +470,8 @@ export function ReportPanel({
               <thead>
                 <tr>
                   <th>Dish</th>
-                  <th>Returned (kg)</th>
-                  <th>Range (kg)</th>
+                  <th>Returned (lb)</th>
+                  <th>Range (lb)</th>
                   <th>Identified return share (%)</th>
                 </tr>
               </thead>
@@ -456,9 +479,9 @@ export function ReportPanel({
                 {data.rows?.map((d) => (
                   <tr key={d.dish_name}>
                     <th>{d.dish_name}</th>
-                    <td>{n(d.total_kg)}</td>
+                    <td>{mass(d.total_kg)}</td>
                     <td>
-                      {n(d.kg_low)}–{n(d.kg_high)}
+                      {mass(d.kg_low)}–{mass(d.kg_high)}
                     </td>
                     <td>{n(d.serving_comparison?.returned_percent)}</td>
                   </tr>
@@ -466,7 +489,7 @@ export function ReportPanel({
               </tbody>
             </table>
             <p>
-              {n(data.unmatched_kg)} kg of unmatched food is included in the
+              {mass(data.unmatched_kg)} lb of unmatched food is included in the
               overall mass, but cannot be attributed to a dish.
             </p>
             <h3>Interpretation and methods</h3>

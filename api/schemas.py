@@ -179,6 +179,10 @@ class TrendsOut(BaseModel):
     hall: str
     data_source: DataSource
     weeks: list[TrendPoint]
+    daily: list[TrendPoint] = Field(
+        default_factory=list,
+        description="Daily totals; week_start holds the observation date in this series.",
+    )
     start: date | None = None
     end: date | None = None
     dishes: list[DishWeeks] = Field(default_factory=list)

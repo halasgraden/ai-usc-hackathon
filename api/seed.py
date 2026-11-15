@@ -105,8 +105,9 @@ def _region(rng: random.Random, dish: KnownDish, factor: float, served_ml: float
         match_score=None,
         volume_ml=round(volume, 1),
         grams=round(est.grams, 1),
-        grams_low=round(est.grams_low, 1),
-        grams_high=round(est.grams_high, 1),
+        # Demo-only ±5% assumption; does not represent validated model accuracy.
+        grams_low=round(round(est.grams, 1) * 0.95, 4),
+        grams_high=round(round(est.grams, 1) * 1.05, 4),
         percent_left=None if unknown else round(pct, 1),
     )
 
