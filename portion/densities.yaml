@@ -1,0 +1,34 @@
+# Bulk densities (g/ml, as served, air gaps included): the table in the
+# product spec, one editable line per class.
+#   basis: published = taken from FAO/INFOODS or USDA cup weights
+#          estimate  = our working assumption, to be replaced by one weighing
+#                      session in the pilot
+# The spec asks for a density range per class but gives none. Until measured,
+# the range is density x (1 +/- relative_uncertainty[basis]). Those two
+# percentages are placeholders chosen by us, not measurements.
+relative_uncertainty:
+  published: 0.15
+  estimate: 0.30
+
+densities:
+  rice_grains:            {density: 0.73, basis: published, source: "FAO/INFOODS: rice, white, boiled"}
+  pasta_plain:            {density: 0.55, basis: published, source: "FAO/INFOODS: pasta, boiled"}
+  pasta_saucy:            {density: 1.00, basis: published, source: "FAO/INFOODS: mac and cheese 0.996, spaghetti and meatballs 1.038"}
+  soup_stew:              {density: 1.03, basis: published, source: "FAO/INFOODS: soups 1.00 to 1.05, beef stew 1.05"}
+  mashed_puree:           {density: 1.00, basis: published, source: "FAO/INFOODS: thick soup (squash, potato) 1.09; rounded down"}
+  beans_lentils:          {density: 0.85, basis: published, source: "FAO/INFOODS: lentils, boiled"}
+  poultry:                {density: 0.59, basis: published, source: "USDA cup weight: roasted chicken, diced"}
+  red_meat:               {density: 0.60, basis: estimate,  source: "assumed close to diced chicken"}
+  fish_seafood:           {density: 0.70, basis: estimate,  source: "near FAO/INFOODS boiled prawns (0.77)"}
+  eggs:                   {density: 0.60, basis: published, source: "FAO/INFOODS: egg, boiled/poached"}
+  tofu_plant_protein:     {density: 0.65, basis: estimate,  source: "estimate"}
+  raw_vegetables:         {density: 0.40, basis: published, source: "USDA: chopped raw broccoli 0.38, carrots 0.46; FAO/INFOODS: sweet pepper 0.39"}
+  cooked_vegetables:      {density: 0.60, basis: estimate,  source: "cooked vegetables pack tighter than raw"}
+  leafy_salad:            {density: 0.20, basis: estimate,  source: "least reliable class"}
+  potatoes_fried_roasted: {density: 0.50, basis: estimate,  source: "published values vary widely"}
+  bread:                  {density: 0.25, basis: published, source: "FAO/INFOODS: bread 0.29, soft roll 0.18"}
+  pizza_burger_sandwich:  {density: 0.45, basis: estimate,  source: "layered, mostly bread"}
+  baked_dessert:          {density: 0.42, basis: published, source: "FAO/INFOODS: cake 0.415"}
+  ice_cream:              {density: 0.56, basis: published, source: "FAO/INFOODS: ice cream 0.554 to 0.56"}
+  yogurt_pudding:         {density: 1.03, basis: published, source: "FAO/INFOODS: plain yogurt 1.031"}
+  cut_fruit:              {density: 0.55, basis: estimate,  source: "estimate"}

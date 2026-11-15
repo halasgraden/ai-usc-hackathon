@@ -1,0 +1,29 @@
+# Voxel51 food-waste ingredient labels -> our FoodCategory (core/types.py).
+# Written from the label counts of the real dataset (375 images). `null` means
+# "do not export this mask". Edit a line and re-run the converter to change it.
+#
+# Coverage warning: these 20 labels reach only 9 of our 21 classes (see
+# labeling/voxel51.py output). Rice, fish, eggs, tofu, bread, burgers, pastries,
+# yogurt, ice cream and cut fruit have no public examples here.
+voxel51:
+  mashed-potatoes: mashed_puree           # 139 instances
+  egg-spaetzle: pasta_plain               # 201; spaetzle are egg noodles, nearest class
+  carrot: cooked_vegetables               # 171
+  green-beans: cooked_vegetables          # 42
+  peas: cooked_vegetables                 # 3
+  cauliflower: cooked_vegetables          # 4
+  zucchini-or-courgette: cooked_vegetables  # 6
+  savoy-cabbage: cooked_vegetables        # 1
+  lentil-stew: soup_stew                  # 78; a stew, so liquid-like density
+  # The spec's soup_stew row is "soups, stews, curries, sauces", so sauces go here.
+  brown-sauce: soup_stew                  # 41
+  light-sauce-or-white-sauce: soup_stew   # 7
+  vegetable-based-cream: soup_stew        # 6
+  gravy: soup_stew                        # 2
+  schnitzel-or-cutlet: red_meat           # 12; pork or chicken, unknown
+  chicken-strips: poultry                 # 26
+  diced-potatoes: potatoes_fried_roasted  # 25
+  coleslaw: raw_vegetables                # 6
+  iceberg-lettuce: leafy_salad            # 1
+  bread-dumplings: null                   # 13; dense, bread-based, no fitting class
+  dressing-portion: null                  # 1

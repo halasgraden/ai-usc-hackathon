@@ -1,0 +1,88 @@
+# Rules for menu/cleaner.py. All text patterns are matched against the
+# normalized key of an entry: lower case, punctuation replaced by spaces.
+# Written against the real Village response for 2026-11-14
+# (tests/fixtures/village_2026-11-14.json).
+
+# The API spells the same station differently between meals.
+station_aliases:
+  "Sweet and Treats": "Sweets and Treats"
+
+# Entries that are announcements, not food. Regexes. In addition, any entry
+# written entirely in capitals and carrying no allergen or diet tags is a
+# notice ("SALAD BAR", "GRILL ITEMS AVAILABLE AT 11AM").
+notice_patterns:
+  - '\bavailable\b'
+  - '\bupon request\b'
+  - '\bmade to order\b'
+
+# Not measurable on a plate. `anywhere` phrases match wherever they appear.
+# `suffix` words only count as the last word of a name that has no "with"/"in",
+# so "Cheddar Cheese Sauce" and "Sunflower Seed Butter" are condiments but
+# "Butter Chicken" and "Pasta with Marinara Sauce" are not.
+condiments:
+  anywhere:
+    - salsa
+    - dressing
+    - vinaigrette
+    - vinegar
+    - ketchup
+    - mayonnaise
+    - syrup
+    - jelly
+    - preserves
+    - hummus
+    - cream cheese
+    - butter balls
+    - oil blend
+    - whipped topping
+    - powdered sugar
+  suffix:
+    - sauce
+    - butter
+    - oil
+    - gravy
+    - mustard
+    - jam
+    - aioli
+
+# Build-your-own fillings and toppings. They stay in the menu with role
+# "component" but are never matching candidates.
+components:
+  prefix: [chopped, crumbled, shredded, diced, dried]
+  exact:
+    - eggs
+    - egg whites
+    - lettuce
+    - spinach
+    - salami
+    - pepperoncini
+    - pepitas
+    - pickle chips
+    - chocolate chips
+    - sliced turkey
+    - sliced ham
+    - sliced roast beef
+    - sliced onions
+    - sliced tomatoes
+    - sliced mushrooms
+    - assorted sliced cheese
+  anywhere: [olives, granola]
+
+# Dishes the menu implies without listing. When at least `min_matches`
+# distinct entries of a meal (notices included) match `pattern`, a synthetic
+# dish is added at the station of the first match.
+#   "Salad Bar Salad" is an ASSUMPTION: the API lists the salad bar's
+#   dressings but none of its greens or toppings. Confirm at the hall.
+composites:
+  - name: Made-to-Order Omelette
+    category: eggs
+    pattern: '\bomelet'
+    min_matches: 1
+  - name: Deli Sandwich
+    category: pizza_burger_sandwich
+    pattern: '^(sliced (turkey|ham|roast beef)|salami)$'
+    min_matches: 2
+  - name: Salad Bar Salad
+    category: leafy_salad
+    pattern: '^salad bar$'
+    min_matches: 1

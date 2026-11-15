@@ -1,0 +1,36 @@
+# Pilot dishes: the first token of a photo's file name ("fries_p2_scraps_03.jpg" -> "fries")
+# selects the food class and the Grounding DINO phrase used to find it.
+# Use "empty" for plates with no food. Hyphens, not underscores, inside a slug.
+fries:
+  category: potatoes_fried_roasted
+  phrase: french fries
+chicken:
+  category: poultry
+  phrase: roasted chicken
+rice-pilaf:
+  category: rice_grains
+  phrase: cooked rice
+pasta:
+  category: pasta_plain
+  phrase: pasta
+carrots:
+  category: cooked_vegetables
+  phrase: roasted carrots
+asparagus:
+  category: cooked_vegetables
+  phrase: asparagus
+burger:
+  category: pizza_burger_sandwich
+  phrase: hamburger
+hotdog:
+  category: pizza_burger_sandwich
+  phrase: hot dog
+crepe:
+  category: baked_dessert
+  phrase: crepe
+grapes:
+  category: cut_fruit
+  phrase: grapes
+short-ribs:
+  category: red_meat
+  phrase: braised beef short ribs

@@ -1,0 +1,36 @@
+# One command for the judges: `docker compose up --build`
+#   api        -> http://localhost:8000  (docs at /docs)
+#   dashboard  -> http://localhost:3000  (enable with `--profile dashboard`
+#                 once dashboard/ exists; see README)
+services:
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LEFTOVER_DATABASE_URL: sqlite:////data/leftover_lens.db
+      LEFTOVER_DATA_DIR: /data
+    volumes:
+      - lens-data:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  dashboard:
+    profiles: ["dashboard"]
+    build: ./dashboard
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  lens-data:

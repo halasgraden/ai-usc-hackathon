@@ -1,0 +1,9 @@
+.git
+.venv
+.env
+**/__pycache__
+data/raw
+data/datasets
+runs
+dashboard/node_modules
+dashboard/.next

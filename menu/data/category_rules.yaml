@@ -1,0 +1,65 @@
+# Keyword rules mapping a dish name to one of the coarse food categories
+# (core.types.FoodCategory). Used by menu/categorizer.py.
+#
+# - Rules are tried top to bottom; the first match wins, so order matters
+#   ("Chicken Noodle Soup" must reach soup_stew before poultry or pasta).
+# - `pattern` is a regex alternation matched on whole words of the normalized
+#   dish key (lower case, no punctuation).
+# - `stations` (optional) restricts a rule to dishes served at those stations.
+# - Meat, poultry and fish rules are skipped for dishes the API tags vegan or
+#   vegetarian, and the egg rule for vegan dishes, so 'Portobello Red Wine
+#   "Pot Roast"' is not filed under red meat.
+# - Anything no rule places is reported as uncategorized; fix it with one line
+#   in overrides.yaml rather than by stretching a pattern.
+#
+# Mapping calls worth knowing about (densities come from the category):
+#   oatmeal, grits -> mashed_puree (thick, no air gaps)
+#   baked potatoes -> potatoes_fried_roasted (its 0.5 g/ml is an estimate
+#     made for fries and tots; a whole baked potato is denser)
+#   pancakes, waffles, french toast -> baked_dessert
+rules:
+  - category: soup_stew
+    pattern: 'soup|stew|chili|curry|chowder|bisque|pozole|gumbo'
+  - category: pizza_burger_sandwich
+    pattern: 'burgers?|hot dogs?|sandwich(es)?|pizza|quesadillas?|burritos?|tacos?|panini|sliders?|grilled cheese|calzone'
+  - category: ice_cream
+    pattern: 'ice cream|soft serve|gelato|sorbet|frozen yogurt'
+  - category: yogurt_pudding
+    pattern: 'yogurt|pudding|parfait'
+  - category: baked_dessert
+    pattern: 'cakes?|cupcakes?|pastr(y|ies)|muffins?|cookies?|brownies?|crepes?|donuts?|doughnuts?|cobbler|scones?|croissants?|danish|cinnamon rolls?|french toast|pancakes?|waffles?'
+  - category: mashed_puree
+    pattern: 'mashed|puree|oatmeal|grits|polenta|congee|porridge'
+  - category: pasta_saucy
+    pattern: 'mac and cheese|macaroni|lasagna|alfredo|bolognese|casserole|ravioli|pasta with|baked ziti'
+  - category: pasta_plain
+    pattern: 'pasta|noodles?|spaghetti|penne|linguine|fettuccine|orzo|lo mein|chow mein'
+  - category: cooked_vegetables
+    pattern: 'green beans'
+  - category: beans_lentils
+    pattern: 'beans?|lentils?|chickpeas?|garbanzo|dal|edamame'
+  - category: tofu_plant_protein
+    pattern: 'tofu|tempeh|seitan|falafel'
+  - category: fish_seafood
+    pattern: 'fish|salmon|tuna|shrimp|cod|tilapia|mahi|crab|seafood|prawns?|calamari|pollock'
+  - category: poultry
+    pattern: 'chicken|turkey|duck'
+  - category: red_meat
+    pattern: 'beef|pork|bacon|sausages?|ham|steak|ribs?|lamb|carnitas|meatballs?|brisket|pot roast|pepperoni|chorizo|carne asada'
+  - category: eggs
+    pattern: 'eggs?|omelet(te)?s?|frittata|quiche'
+  - category: potatoes_fried_roasted
+    pattern: 'fries|tots|hash browns?|potato(es)?|yams?|wedges'
+  - category: rice_grains
+    pattern: 'rice|pilaf|quinoa|farro|couscous|barley|cereal'
+  - category: cut_fruit
+    pattern: 'fruits?|melon|berries|pineapple|grapes|bananas?|apples?'
+  - category: leafy_salad
+    pattern: 'salad|greens|caesar|kale|slaw'
+  - category: raw_vegetables
+    stations: [Salad Bar]
+    pattern: 'broccoli|carrots?|cucumbers?|celery|peppers?|tomato(es)?|radish(es)?|onions?'
+  - category: cooked_vegetables
+    pattern: 'broccoli|carrots?|asparagus|zucchini|squash|cauliflower|brussels|corn|peas|vegetables?|veggies?|mushrooms?|portobello|cabbage|eggplant|bok choy|peppers?|spinach|onions?|tomato(es)?'
+  - category: bread
+    pattern: 'bread|buns?|rolls?|bagels?|toast|tortillas?|pita|naan|biscuits?|baguette|focaccia|wraps?'

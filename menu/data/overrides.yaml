@@ -1,0 +1,8 @@
+# Manual category overrides, checked before any rule or cached decision.
+# Key: the dish name as the menu prints it (case and punctuation are ignored).
+# Value: a category from core.types.FoodCategory, or null to mark a dish as
+# deliberately uncategorized.
+#
+# Example:
+#   "Shepherd's Pie": mashed_puree
+overrides: {}

@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+build/
+*.egg-info/
+# data and model artefacts: fetched or produced by scripts, never committed
+data/raw/
+data/datasets/
+data/menus/*/
+data/category_cache.json
+*.db
+runs/
+*.pt
+*.onnx
+# dashboard
+node_modules/
+.next/
