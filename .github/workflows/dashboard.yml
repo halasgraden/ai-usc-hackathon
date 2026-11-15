@@ -1,0 +1,52 @@
+name: Dashboard
+on:
+  push:
+    paths: ['dashboard/**', 'api/**', 'analytics/**', 'tests/test_dashboard_metrics.py', '.github/workflows/dashboard.yml']
+  pull_request:
+    paths: ['dashboard/**', 'api/**', 'analytics/**', 'tests/test_dashboard_metrics.py', '.github/workflows/dashboard.yml']
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    env:
+      LEFTOVER_STAFF_TOKEN: local-demo-staff
+      LEFTOVER_DEVICE_TOKEN: local-demo-device
+      PLAYWRIGHT_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: pip install -e '.[dev]'
+      - run: npm ci
+        working-directory: dashboard
+      - run: npx playwright install --with-deps chromium
+        working-directory: dashboard
+      - run: python dashboard/scripts/export_openapi.py && npm --prefix dashboard run generate:types
+      - run: git diff --exit-code -- dashboard/openapi.json dashboard/src/lib/api.generated.ts
+      - run: npm run typecheck && npm run lint && npm run build
+        working-directory: dashboard
+      - run: python -m api.seed --end 2026-11-15
+      - name: Start local services
+        run: |
+          python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 > /tmp/leftover-api.log 2>&1 &
+          npm --prefix dashboard run start > /tmp/leftover-next.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health && curl -fsS http://127.0.0.1:3000 > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/leftover-api.log /tmp/leftover-next.log
+          exit 1
+      - run: npm test
+        working-directory: dashboard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-evidence
+          path: |
+            .impeccable/review/
+            dashboard/test-results/

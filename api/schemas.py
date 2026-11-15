@@ -70,7 +70,25 @@ class PlateImageAccepted(PlateAccepted):
     regions: list[RegionIn]
 
 
-class Headline(BaseModel):
+class ServingComparison(BaseModel):
+    """Matched leftover mass / simulated served mass, for a complete seeded cohort only."""
+
+    served_kg: float
+    servings: int
+    returned_percent: float
+    returned_percent_low: float
+    returned_percent_high: float
+    data_source: Literal["seeded"] = "seeded"
+    basis: str = "Identified leftovers / simulated servings; unmatched food is excluded."
+
+
+class MassEstimate(BaseModel):
+    kg_low: float | None = None
+    kg_high: float | None = None
+    serving_comparison: ServingComparison | None = None
+
+
+class Headline(MassEstimate):
     """The three numbers at the top of the Today screen."""
 
     kg_wasted: float
@@ -83,7 +101,7 @@ class Headline(BaseModel):
     est_co2e_kg: float | None = None
 
 
-class DishRow(BaseModel):
+class DishRow(MassEstimate):
     dish_name: str
     station: str | None = None
     category: FoodCategory | None = None
@@ -91,6 +109,11 @@ class DishRow(BaseModel):
     total_kg: float
     mean_percent_left: float | None
     trend: Literal["up", "down", "flat", "unknown"] = "unknown"
+    mean_grams: float | None = None
+    mean_grams_low: float | None = None
+    mean_grams_high: float | None = None
+    previous_total_kg: float | None = None
+    previous_mean_percent_left: float | None = None
 
 
 class TodayOut(BaseModel):
@@ -118,6 +141,12 @@ class DishesOut(BaseModel):
     end: date
     data_source: DataSource
     rows: list[DishRow]
+    headline: Headline | None = None
+    plates_seen: int = 0
+    unmatched_kg: float = 0
+    assumptions: dict[str, str] = Field(default_factory=dict)
+    stations: list[str] = Field(default_factory=list)
+    meals: list[str] = Field(default_factory=list)
 
 
 class DishDetailOut(BaseModel):
@@ -129,12 +158,19 @@ class DishDetailOut(BaseModel):
     weekly: list[TrendPoint]
 
 
-class TrendPoint(BaseModel):
+class TrendPoint(MassEstimate):
     """One week of one series; ``kg_wasted`` and ``waste_rate_percent`` as in ``Headline``."""
 
     week_start: date
+    partial: bool = False
     kg_wasted: float
     waste_rate_percent: float | None
+
+
+class DishWeeks(BaseModel):
+    dish_name: str
+    station: str | None = None
+    weeks: list[TrendPoint]
 
 
 class TrendsOut(BaseModel):
@@ -143,6 +179,9 @@ class TrendsOut(BaseModel):
     hall: str
     data_source: DataSource
     weeks: list[TrendPoint]
+    start: date | None = None
+    end: date | None = None
+    dishes: list[DishWeeks] = Field(default_factory=list)
 
 
 class ReportOut(BaseModel):
@@ -153,6 +192,11 @@ class ReportOut(BaseModel):
     data_source: DataSource
     headline: Headline
     top_dishes: list[DishRow]
+    rows: list[DishRow] = Field(default_factory=list)
+    plates_seen: int = 0
+    unmatched_kg: float = 0
+    week_end: date | None = None
+    partial: bool = False
     methods_note: str
     assumptions: dict[str, str] = Field(description="Cost and CO2e factors, named and explained")
 

@@ -29,7 +29,7 @@ from zoneinfo import ZoneInfo
 from sqlmodel import Session, col, delete
 
 from api.dishes import BRUNCH, DINNER, KnownDish
-from api.models import Database, Plate, PlateEvent
+from api.models import Database, Plate, PlateEvent, ServingRecord
 from api.plates import add_plate
 from api.schemas import PlateIn, RegionIn
 from api.settings import Settings
@@ -92,10 +92,11 @@ RISING_DISH = "Rice Pilaf"
 """One dish whose leftovers grow instead, so a dish row can show trend "up"."""
 
 
-def _region(rng: random.Random, dish: KnownDish, factor: float) -> RegionIn:
+def _region(rng: random.Random, dish: KnownDish, factor: float, served_ml: float) -> RegionIn:
     _, typical = PROFILE.get(dish.name, (1.0, 22.0))
     pct = min(180.0, typical * factor * rng.lognormvariate(0.0, 0.45))
-    volume = REFERENCE_ML[dish.category] * pct / 100.0
+    volume = min(REFERENCE_ML[dish.category] * pct / 100.0, served_ml / 1.5)
+    pct = volume / REFERENCE_ML[dish.category] * 100.0
     est = estimate_grams(volume, dish.category)
     unknown = rng.random() < UNKNOWN_SHARE
     return RegionIn(
@@ -110,28 +111,49 @@ def _region(rng: random.Random, dish: KnownDish, factor: float) -> RegionIn:
     )
 
 
-def generate_plates(start: date, end: date, seed: int = DEFAULT_SEED) -> list[PlateIn]:
+def generate_demo(
+    start: date, end: date, seed: int = DEFAULT_SEED
+) -> tuple[list[PlateIn], list[ServingRecord]]:
     """Simulated plates for every day from ``start`` to ``end`` inclusive (hall-local times)."""
     plates: list[PlateIn] = []
+    serving_totals: dict[tuple[date, str, str], ServingRecord] = {}
     day = start
     while day <= end:
         weeks_in = (day - start).days / 7.0
         for meal in WEEKEND_MEALS if day.weekday() >= 5 else WEEKDAY_MEALS:
             rng = random.Random(f"{seed}:{day.isoformat()}:{meal.name}")
+            served_rng = random.Random(f"servings:{seed}:{day.isoformat()}:{meal.name}")
             weights = [PROFILE.get(d.name, (1.0, 22.0))[0] for d in meal.dishes]
             opens = datetime.combine(day, meal.opens)
             minutes = int((datetime.combine(day, meal.closes) - opens).total_seconds() // 60)
             for _ in range(round(meal.plates * rng.uniform(0.85, 1.15))):
                 count = rng.choices((0, 1, 2, 3), weights=(12, 35, 35, 18))[0]
                 chosen: list[KnownDish] = []
-                while len(chosen) < count:
+                served_count = count or served_rng.randint(1, 3)
+                while len(chosen) < served_count:
                     pick = rng.choices(meal.dishes, weights=weights)[0]
                     if pick not in chosen:
                         chosen.append(pick)
                 regions = []
                 for dish in chosen:
                     drift = 1.0 + (0.05 if dish.name == RISING_DISH else -WEEKLY_IMPROVEMENT)
-                    regions.append(_region(rng, dish, max(0.3, drift**weeks_in)))
+                    # Choose initial portions before leftovers, including clean plates.
+                    served_ml = REFERENCE_ML[dish.category] * served_rng.uniform(0.85, 1.4)
+                    key = (day, meal.name, dish.name)
+                    if key not in serving_totals:
+                        serving_totals[key] = ServingRecord(
+                            hall="",
+                            day=day,
+                            meal=meal.name,
+                            dish_name=dish.name,
+                            servings=0,
+                            served_kg=0,
+                        )
+                    record = serving_totals[key]
+                    record.servings += 1
+                    record.served_kg += estimate_grams(served_ml, dish.category).grams / 1000
+                    if count:
+                        regions.append(_region(rng, dish, max(0.3, drift**weeks_in), served_ml))
                 plates.append(
                     PlateIn(
                         plate_id=f"{rng.getrandbits(64):016x}",
@@ -141,13 +163,18 @@ def generate_plates(start: date, end: date, seed: int = DEFAULT_SEED) -> list[Pl
                     )
                 )
         day += timedelta(days=1)
-    return plates
+    return plates, list(serving_totals.values())
+
+
+def generate_plates(start: date, end: date, seed: int = DEFAULT_SEED) -> list[PlateIn]:
+    """Compatibility wrapper; plates and servings share one deterministic simulation."""
+    return generate_demo(start, end, seed)[0]
 
 
 def clear_seeded(db: Database, hall: str) -> None:
     """Delete seeded plates for ``hall``; live plates are never touched."""
     with Session(db.engine) as session:
-        for table in (PlateEvent, Plate):
+        for table in (PlateEvent, Plate, ServingRecord):
             session.exec(
                 delete(table).where(col(table.hall) == hall, col(table.data_source) == "seeded")
             )
@@ -164,9 +191,12 @@ def seed(
     seed_value: int = DEFAULT_SEED,
 ) -> int:
     """Replace the hall's seeded plates with freshly generated ones; returns the plate count."""
-    plates = generate_plates(start, end, seed_value)
+    plates, servings = generate_demo(start, end, seed_value)
     clear_seeded(db, hall)
     with Session(db.engine) as session:
+        for record in servings:
+            record.hall = hall
+            session.add(record)
         for plate in plates:
             add_plate(session, plate, hall=hall, timezone=timezone, data_source="seeded")
         session.commit()

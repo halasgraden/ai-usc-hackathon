@@ -8,6 +8,33 @@ plates, never people: no student app, no IDs, no faces.
 USC forecasts what to cook and composts what is left, but nothing measures
 plate waste per dish. This fills that gap.
 
+## Run the dining dashboard
+
+The administrator demo is now a working **two-tab dashboard** backed by the API:
+all 37 seeded menu dishes, uncertainty ranges, simulated serving comparisons,
+inline dish inspection, trends, CSV export, and weekly PDF/email previews.
+
+```bash
+# Terminal 1, from the repo root (Python environment installed as below)
+python -m api.seed
+LEFTOVER_STAFF_TOKEN=local-demo-staff LEFTOVER_DEVICE_TOKEN=local-demo-device python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2
+cd dashboard
+npm ci
+cp .env.example .env.local
+npm run dev
+```
+
+Open **http://127.0.0.1:3000**. This is a local demo; generated plate and serving data
+is visibly labeled. No CV weights are needed to explore it. No real CBORD connection
+or email sending is claimed.
+
+[Dashboard setup, metric definitions, workflow research and judging walkthrough](dashboard/README.md)
+· [Verification evidence](docs/DASHBOARD_VERIFICATION.md)
+
+![Full-menu dining dashboard](dashboard/public/evidence/desktop.png)
+
 ## How it works
 
 | Stage | Module | What it does |
@@ -37,7 +64,8 @@ plate waste per dish. This fills that gap.
 | `capture/` source, plate trigger, YuNet face guard, rig loop `python -m capture` | Tested on synthetic frames and against the API with a fake pipeline; trigger thresholds untuned; face guard fails closed and the real YuNet model has not been run yet |
 | `api/` | All endpoints in `docs/CONTRACTS.md` work on SQLite; `POST /plates/image` runs segment, merge per class, depth to ml, grams, menu match (tested with fake models; needs the exported ONNX model, DA3 and SigLIP installed to run for real) |
 | `analytics/` per-dish aggregates, trends, high-waste flags; `python -m api.seed` demo data (labelled `seeded`) | Working, tested |
-| `dashboard/`, grams eval (needs weighed plates) | Not started; API and dashboard contracts are in `docs/CONTRACTS.md` |
+| `dashboard/` | Working Next.js two-tab module using FastAPI; full menu, trends, serving comparisons, uncertainty, CSV and report export. See `dashboard/README.md`. |
+| Grams eval (needs weighed plates) | Not measured yet. |
 
 ## Results
 

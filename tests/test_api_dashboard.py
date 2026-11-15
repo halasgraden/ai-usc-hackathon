@@ -115,14 +115,17 @@ def test_today_headline_and_top_dishes(live: TestClient) -> None:
     assert body["meal"] is None
     assert body["plates_seen"] == 4  # the clean plate counts
     assert body["regions_for_review"] == 1
-    assert body["headline"] == {
+    assert {
+        k: body["headline"][k]
+        for k in ("kg_wasted", "waste_rate_percent", "est_cost_usd", "est_co2e_kg")
+    } == {
         "kg_wasted": 0.73,  # unknown region included
         "waste_rate_percent": 45.0,  # mean of 50, 20, 100, 10 (matched only)
         "est_cost_usd": 7.3,
         "est_co2e_kg": 1.46,
     }
     rice, chicken = body["top_dishes"]
-    assert rice == {
+    assert {k: rice[k] for k in ("dish_name", "station", "category", "plates_seen", "total_kg", "mean_percent_left", "trend")} == {
         "dish_name": "Rice Pilaf", "station": "Flexitarian", "category": "rice_grains",
         "plates_seen": 3, "total_kg": 0.45, "mean_percent_left": 53.3, "trend": "up",
     }  # fmt: skip
@@ -204,7 +207,9 @@ def test_dish_detail(live: TestClient) -> None:
     assert body["data_source"] == "live"
     assert body["dish"]["plates_seen"] == 4
     assert body["percent_left_samples"] == [20.0, 10.0, 50.0, 100.0]  # in time order
-    assert body["weekly"] == [
+    assert [
+        {k: w[k] for k in ("week_start", "kg_wasted", "waste_rate_percent")} for w in body["weekly"]
+    ] == [
         {"week_start": "2026-11-02", "kg_wasted": 0.1, "waste_rate_percent": 20.0},
         {"week_start": "2026-11-09", "kg_wasted": 0.45, "waste_rate_percent": 53.3},
     ]

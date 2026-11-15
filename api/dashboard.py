@@ -2,39 +2,30 @@
 
 from __future__ import annotations
 
-from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, col, func, select
 
 from analytics.aggregates import (
-    PlateObservation,
-    mean_percent_left,
-    summarize_dishes,
-    total_kg,
-    trend_direction,
     week_start,
-    weekly_points,
 )
 from analytics.assumptions import CostFactors
+from api import metrics
 from api.dishes import station_of
-from api.models import Database, Plate, PlateEvent
+from api.models import Database, Plate, PlateEvent, ServingRecord
 from api.schemas import (
     DataSource,
     DishDetailOut,
     DishesOut,
-    DishRow,
-    Headline,
+    DishWeeks,
     ReportOut,
     TodayOut,
-    TrendPoint,
     TrendsOut,
 )
-from core.types import FoodCategory
 
 TOP_DISHES = 5
 DEFAULT_DISHES_DAYS = 7
@@ -59,60 +50,6 @@ SEEDED_NOTE = " This report is built from simulated (seeded) demo data, not from
 
 def _start_of(day: date) -> datetime:
     return datetime.combine(day, time.min)
-
-
-def _r(value: float | None, digits: int) -> float | None:
-    return None if value is None else round(value, digits)
-
-
-def _observations(events: Sequence[PlateEvent]) -> list[PlateObservation]:
-    return [
-        PlateObservation(
-            e.hall, e.meal, e.observed_at, e.dish_name, e.grams, e.percent_left, e.plate_id
-        )
-        for e in events
-    ]
-
-
-def _headline(events: Sequence[PlateEvent], factors: CostFactors) -> Headline:
-    observations = _observations(events)
-    kg = total_kg(observations)
-    return Headline(
-        kg_wasted=round(kg, 2),
-        waste_rate_percent=_r(mean_percent_left(observations), 1),
-        est_cost_usd=round(factors.est_cost_usd(kg), 2),
-        est_co2e_kg=round(factors.est_co2e_kg(kg), 2),
-    )
-
-
-def _category(values: Counter[str]) -> FoodCategory | None:
-    if not values:
-        return None
-    try:
-        return FoodCategory(values.most_common(1)[0][0])
-    except ValueError:
-        return None
-
-
-def _rows(current: Sequence[PlateEvent], previous: Sequence[PlateEvent]) -> list[DishRow]:
-    """Dish rows, most kg first; ``trend`` compares mean percent left with ``previous``."""
-    before = {s.dish_name: s.mean_percent_left for s in summarize_dishes(_observations(previous))}
-    categories: dict[str, Counter[str]] = {}
-    for e in current:
-        if e.dish_name is not None:
-            categories.setdefault(e.dish_name, Counter())[e.category] += 1
-    return [
-        DishRow(
-            dish_name=s.dish_name,
-            station=station_of(s.dish_name),
-            category=_category(categories.get(s.dish_name, Counter())),
-            plates_seen=s.plates_seen,
-            total_kg=round(s.total_kg, 3),
-            mean_percent_left=_r(s.mean_percent_left, 1),
-            trend=trend_direction(s.mean_percent_left, before.get(s.dish_name)),
-        )
-        for s in summarize_dishes(_observations(current))
-    ]
 
 
 def _check_range(start: date, end: date) -> None:
@@ -142,6 +79,16 @@ class _Store:
         if dish is not None:
             query = query.where(PlateEvent.dish_name == dish)
         return list(self.session.exec(query.order_by(col(PlateEvent.observed_at))).all())
+
+    def servings(self, start: date, end: date, meal: str | None = None) -> list[ServingRecord]:
+        query = select(ServingRecord).where(
+            ServingRecord.hall == self.hall,
+            ServingRecord.day >= start,
+            ServingRecord.day < end,
+        )
+        if meal:
+            query = query.where(func.lower(ServingRecord.meal) == meal.strip().lower())
+        return list(self.session.exec(query).all())
 
     def plate_count(self, start: date, end: date, meal: str | None = None) -> int:
         query = (
@@ -210,48 +157,75 @@ def build_router(
                 day=d,
                 meal=meal,
                 data_source=store.data_source(d, end),
-                headline=_headline(events, factors),
-                top_dishes=_rows(events, previous)[:TOP_DISHES],
+                headline=metrics.headline(events, store.servings(d, end, meal), factors),
+                top_dishes=metrics.rows(events, previous, store.servings(d, end, meal))[
+                    :TOP_DISHES
+                ],
                 plates_seen=store.plate_count(d, end, meal),
                 regions_for_review=sum(1 for e in events if e.needs_review),
                 assumptions=factors.describe(),
             )
 
+    def filter_events(
+        events: list[PlateEvent], station: str | None, search: str | None
+    ) -> list[PlateEvent]:
+        return [
+            e
+            for e in events
+            if (not station or station_of(e.dish_name or "") == station)
+            and (not search or search.casefold() in (e.dish_name or "").casefold())
+        ]
+
+    def filter_servings(
+        records: list[ServingRecord], station: str | None, search: str | None
+    ) -> list[ServingRecord]:
+        return [
+            r
+            for r in records
+            if (not station or station_of(r.dish_name) == station)
+            and (not search or search.casefold() in r.dish_name.casefold())
+        ]
+
     @router.get("/dashboard/dishes", dependencies=staff, tags=["dashboard"])
     def dashboard_dishes(
-        start: date | None = None, end: date | None = None, meal: str | None = None
+        start: date | None = None,
+        end: date | None = None,
+        meal: str | None = None,
+        station: str | None = None,
+        search: str | None = None,
     ) -> DishesOut:
-        """Every dish seen from ``start`` to ``end`` inclusive (default: the last 7 days).
-
-        Dish trends compare with the period of the same length just before ``start``.
-        """
         last = end or today()
         first = start or last - timedelta(days=DEFAULT_DISHES_DAYS - 1)
         _check_range(first, last)
         stop = last + timedelta(days=1)
         with Session(db.engine) as session:
             store = _Store(session, hall)
-            events = store.events(first, stop, meal)
-            previous = store.events(first - (stop - first), first, meal)
+            all_events = store.events(first, stop)
+            events = filter_events(store.events(first, stop, meal), station, search)
+            previous = filter_events(
+                store.events(first - (stop - first), first, meal), station, search
+            )
+            servings = filter_servings(store.servings(first, stop, meal), station, search)
             return DishesOut(
                 hall=hall,
                 start=first,
                 end=last,
                 data_source=store.data_source(first, stop),
-                rows=_rows(events, previous),
+                rows=metrics.rows(events, previous, servings),
+                headline=metrics.headline(events, servings, factors),
+                plates_seen=len({e.plate_id for e in events})
+                if station or search
+                else store.plate_count(first, stop, meal),
+                unmatched_kg=round(sum(e.grams for e in events if e.dish_name is None) / 1000, 6),
+                assumptions=factors.describe(),
+                stations=sorted({s for e in all_events if (s := station_of(e.dish_name or ""))}),
+                meals=sorted({e.meal for e in all_events}),
             )
 
     @router.get("/dashboard/dishes/{dish_name:path}", dependencies=staff, tags=["dashboard"])
     def dashboard_dish(
-        dish_name: str,
-        start: date | None = None,
-        end: date | None = None,
-        meal: str | None = None,
+        dish_name: str, start: date | None = None, end: date | None = None, meal: str | None = None
     ) -> DishDetailOut:
-        """One dish from ``start`` to ``end`` inclusive (default: the last 28 days).
-
-        404 if the dish has no matched regions in that window.
-        """
         last = end or today()
         first = start or last - timedelta(days=DEFAULT_DETAIL_DAYS - 1)
         _check_range(first, last)
@@ -259,75 +233,92 @@ def build_router(
         with Session(db.engine) as session:
             store = _Store(session, hall)
             events = store.events(first, stop, meal, dish=dish_name)
-            if not events:
-                raise HTTPException(
-                    status.HTTP_404_NOT_FOUND,
-                    f"no plates recorded for {dish_name!r} between {first} and {last}",
-                )
+            servings = [r for r in store.servings(first, stop, meal) if r.dish_name == dish_name]
+            if not events and not servings:
+                raise HTTPException(404, "No observations for this dish in the selected period.")
             previous = store.events(first - (stop - first), first, meal, dish=dish_name)
             samples = [round(e.percent_left, 1) for e in events if e.percent_left is not None]
             stride = -(-len(samples) // MAX_SAMPLES) or 1
             return DishDetailOut(
-                dish=_rows(events, previous)[0],
+                dish=metrics.rows(events, previous, servings)[0],
                 data_source=store.data_source(first, stop),
                 percent_left_samples=samples[::stride],
-                weekly=[
-                    TrendPoint(
-                        week_start=p.week_start,
-                        kg_wasted=round(p.kg_wasted, 3),
-                        waste_rate_percent=_r(p.waste_rate_percent, 1),
-                    )
-                    for p in weekly_points(_observations(events))
-                ],
+                weekly=metrics.weekly(events, servings, first, last, today()),
             )
 
     @router.get("/dashboard/trends", dependencies=staff, tags=["dashboard"])
-    def dashboard_trends(weeks: Annotated[int, Query(ge=1, le=52)] = 8) -> TrendsOut:
-        """Weekly totals for the last ``weeks`` weeks, the current (partial) week included.
-
-        Weeks start on Monday. Weeks without any plate are omitted, not shown as zero.
-        """
-        stop = today() + timedelta(days=1)
-        first = week_start(today()) - timedelta(weeks=weeks - 1)
+    def dashboard_trends(
+        weeks: Annotated[int, Query(ge=1, le=52)] = 8,
+        start: date | None = None,
+        end: date | None = None,
+        meal: str | None = None,
+        station: str | None = None,
+        search: str | None = None,
+    ) -> TrendsOut:
+        last = end or today()
+        first = start or week_start(last) - timedelta(weeks=weeks - 1)
+        _check_range(first, last)
+        stop = last + timedelta(days=1)
         with Session(db.engine) as session:
             store = _Store(session, hall)
-            events = store.events(first, stop)
+            events = filter_events(store.events(first, stop, meal), station, search)
+            servings = filter_servings(store.servings(first, stop, meal), station, search)
+            names = sorted(
+                {e.dish_name for e in events if e.dish_name} | {r.dish_name for r in servings}
+            )
             return TrendsOut(
                 hall=hall,
                 data_source=store.data_source(first, stop),
-                weeks=[
-                    TrendPoint(
-                        week_start=p.week_start,
-                        kg_wasted=round(p.kg_wasted, 2),
-                        waste_rate_percent=_r(p.waste_rate_percent, 1),
+                start=first,
+                end=last,
+                weeks=metrics.weekly(events, servings, first, last, today()),
+                dishes=[
+                    DishWeeks(
+                        dish_name=name,
+                        station=station_of(name),
+                        weeks=metrics.weekly(
+                            [e for e in events if e.dish_name == name],
+                            [r for r in servings if r.dish_name == name],
+                            first,
+                            last,
+                            today(),
+                        ),
                     )
-                    for p in weekly_points(_observations(events))
+                    for name in names
                 ],
             )
 
     @router.get("/report/weekly", tags=["report"])
     def report_weekly(
         week_start_day: Annotated[date | None, Query(alias="week_start")] = None,
+        meal: str | None = None,
+        station: str | None = None,
+        search: str | None = None,
     ) -> ReportOut:
-        """Public, aggregated weekly report for USC Student Government.
-
-        ``week_start`` may be any day; the report covers the Monday-to-Sunday week
-        containing it. Default: the last complete week. Only per-dish totals are
-        returned, never individual plates.
-        """
         first = week_start(week_start_day or today() - timedelta(days=7))
         stop = first + timedelta(days=7)
         with Session(db.engine) as session:
             store = _Store(session, hall)
-            events = store.events(first, stop)
-            previous = store.events(first - timedelta(days=7), first)
+            events = filter_events(store.events(first, stop, meal), station, search)
+            previous = filter_events(
+                store.events(first - timedelta(days=7), first, meal), station, search
+            )
+            servings = filter_servings(store.servings(first, stop, meal), station, search)
             source = store.data_source(first, stop)
+            dish_rows = metrics.rows(events, previous, servings)
             return ReportOut(
                 hall=hall,
                 week_start=first,
+                week_end=stop - timedelta(days=1),
+                partial=stop > today(),
                 data_source=source,
-                headline=_headline(events, factors),
-                top_dishes=_rows(events, previous)[:TOP_DISHES],
+                headline=metrics.headline(events, servings, factors),
+                top_dishes=dish_rows[:TOP_DISHES],
+                rows=dish_rows,
+                plates_seen=len({e.plate_id for e in events})
+                if station or search
+                else store.plate_count(first, stop, meal),
+                unmatched_kg=round(sum(e.grams for e in events if e.dish_name is None) / 1000, 6),
                 methods_note=METHODS_NOTE + (SEEDED_NOTE if source == "seeded" else ""),
                 assumptions=factors.describe(),
             )

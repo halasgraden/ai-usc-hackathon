@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Engine
@@ -48,6 +48,20 @@ class PlateEvent(SQLModel, table=True):
     match_score: float | None = None
     needs_review: bool = False
     data_source: str = Field(default="live", index=True, description='"live" or "seeded"')
+
+
+class ServingRecord(SQLModel, table=True):
+    """Simulated food issued to the same captured meal population, never a sales count."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    hall: str = Field(index=True)
+    day: date = Field(index=True)
+    meal: str
+    dish_name: str = Field(index=True)
+    servings: int
+    served_kg: float
+    data_source: str = Field(default="seeded", index=True)
+    capture_complete: bool = True
 
 
 def round_to_quarter_hour(moment: datetime) -> datetime:

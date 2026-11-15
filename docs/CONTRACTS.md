@@ -46,3 +46,35 @@ the matcher's `MatchDetail.reason` and candidate probabilities (`menu/matcher.py
 | Vision | `capture/`, `vision/`, `labeling/`, `augment/`, `depth/` | `core/`, `api/` |
 | Match and eval | `menu/` (matcher), `eval/`, `portion/` | `core/` |
 | Integration (lead) | `core/`, `api/schemas.py`, `tests/` integration, `README.md`, CI | |
+
+## Dashboard additions (November 15)
+
+Existing field meanings remain unchanged. In particular, `waste_rate_percent`
+and `mean_percent_left` remain reference-portion indices.
+
+- `Headline`, `DishRow`, and `TrendPoint` now include `kg_low`, `kg_high`, and
+  nullable `serving_comparison`. The latter exposes simulated `served_kg`,
+  `servings`, `returned_percent`, its lower/upper bounds, source and basis.
+- `DishRow` adds `mean_grams` and bounds, `previous_total_kg`, and
+  `previous_mean_percent_left`. The existing `trend` still compares the portion
+  index; the UI's change-in-kg column uses `previous_total_kg` instead.
+- `/dashboard/dishes` accepts `station` and case-insensitive `search`, and returns
+  the entire matched/served menu, filtered headline, distinct plate count,
+  unmatched mass, cost assumptions, and available stations/meals.
+- `/dashboard/trends` additionally accepts `start`, `end`, `meal`, `station`,
+  `search`, and returns bulk `dishes[].weeks`, explicit bounds and partial-week
+  flags. Omitted weeks mean missing observations, never zero waste.
+- `/report/weekly` additionally accepts `meal`, `station`, `search`, and returns
+  all `rows` as well as the existing top five, distinct plate count, unmatched
+  mass, week end, partial status, and the same enriched headline.
+- `ServingRecord` stores seeded day/meal/dish totals with a complete-capture
+  flag. The seed creates serving and return quantities together. Reseeding
+  replaces seeded serving rows alongside seeded plates and preserves live data.
+- `serving_comparison` is absent for live or incompatible observation cohorts.
+  Unknown-food mass is included in the overall kg total but never assigned to
+  a dish or included in the identified-return percentage numerator.
+
+The Next.js dashboard makes allowlisted, read-only server requests with the
+staff Bearer token. The browser does not hold that token. The local demo proxy
+has no user authentication; keep it bound to loopback until institutional auth
+is implemented. See `dashboard/README.md` for generation and integration steps.

@@ -1,0 +1,1894 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Leftover Lens API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/menu/{day}": {
+      "get": {
+        "summary": "Menu For Day",
+        "description": "The cleaned, categorized menu: what the camera may recognize that day.",
+        "operationId": "menu_for_day_menu__day__get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyMenu"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plates": {
+      "post": {
+        "tags": [
+          "plates"
+        ],
+        "summary": "Upload Plate",
+        "description": "Store one plate measured by the rig.\n\nIdempotent on ``plate_id``: re-sending a plate the server already has\nstores nothing new and returns the counts stored the first time.",
+        "operationId": "upload_plate_plates_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlateAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plates/image": {
+      "post": {
+        "tags": [
+          "plates"
+        ],
+        "summary": "Upload Plate Image",
+        "description": "Photo upload from the phone ``/capture`` page: segment, measure, match, store.\n\nNothing is stored when the photo cannot be measured (422 with the reason). A\nphoto with a plate and no food is stored as a clean plate.",
+        "operationId": "upload_plate_image_plates_image_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_plate_image_plates_image_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlateImageAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/today": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Today",
+        "description": "One day (default: today in the hall's time zone), optionally one meal.\n\nDish trends compare with the 7 days before ``day``.",
+        "operationId": "dashboard_today_dashboard_today_get",
+        "parameters": [
+          {
+            "name": "meal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/dishes": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Dishes",
+        "operationId": "dashboard_dishes_dashboard_dishes_get",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "meal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal"
+            }
+          },
+          {
+            "name": "station",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DishesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/dishes/{dish_name}": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Dish",
+        "operationId": "dashboard_dish_dashboard_dishes__dish_name__get",
+        "parameters": [
+          {
+            "name": "dish_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dish Name"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "meal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DishDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/trends": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard Trends",
+        "operationId": "dashboard_trends_dashboard_trends_get",
+        "parameters": [
+          {
+            "name": "weeks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 52,
+              "minimum": 1,
+              "default": 8,
+              "title": "Weeks"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "meal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal"
+            }
+          },
+          {
+            "name": "station",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/report/weekly": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "summary": "Report Weekly",
+        "operationId": "report_weekly_report_weekly_get",
+        "parameters": [
+          {
+            "name": "week_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Week Start"
+            }
+          },
+          {
+            "name": "meal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal"
+            }
+          },
+          {
+            "name": "station",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Station"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_plate_image_plates_image_post": {
+        "properties": {
+          "image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Image",
+            "description": "JPEG or PNG, plate seen from above"
+          },
+          "meal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Meal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image",
+          "meal"
+        ],
+        "title": "Body_upload_plate_image_plates_image_post"
+      },
+      "DailyMenu": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "hall": {
+            "type": "string",
+            "title": "Hall"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/MealMenu"
+            },
+            "type": "array",
+            "title": "Meals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "hall",
+          "source",
+          "meals"
+        ],
+        "title": "DailyMenu",
+        "description": "One hall's cleaned menu for one day. Only meals actually served are listed."
+      },
+      "DishDetailOut": {
+        "properties": {
+          "dish": {
+            "$ref": "#/components/schemas/DishRow"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": [
+              "live",
+              "seeded"
+            ],
+            "title": "Data Source"
+          },
+          "percent_left_samples": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Percent Left Samples",
+            "description": "For the distribution chart"
+          },
+          "weekly": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "type": "array",
+            "title": "Weekly"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dish",
+          "data_source",
+          "percent_left_samples",
+          "weekly"
+        ],
+        "title": "DishDetailOut",
+        "description": "``GET /dashboard/dishes/{dish_name}``."
+      },
+      "DishRow": {
+        "properties": {
+          "kg_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg Low"
+          },
+          "kg_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg High"
+          },
+          "serving_comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServingComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dish_name": {
+            "type": "string",
+            "title": "Dish Name"
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FoodCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plates_seen": {
+            "type": "integer",
+            "title": "Plates Seen"
+          },
+          "total_kg": {
+            "type": "number",
+            "title": "Total Kg"
+          },
+          "mean_percent_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Percent Left"
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "flat",
+              "unknown"
+            ],
+            "title": "Trend",
+            "default": "unknown"
+          },
+          "mean_grams": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Grams"
+          },
+          "mean_grams_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Grams Low"
+          },
+          "mean_grams_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Grams High"
+          },
+          "previous_total_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Total Kg"
+          },
+          "previous_mean_percent_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Mean Percent Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dish_name",
+          "plates_seen",
+          "total_kg",
+          "mean_percent_left"
+        ],
+        "title": "DishRow"
+      },
+      "DishWeeks": {
+        "properties": {
+          "dish_name": {
+            "type": "string",
+            "title": "Dish Name"
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "type": "array",
+            "title": "Weeks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dish_name",
+          "weeks"
+        ],
+        "title": "DishWeeks"
+      },
+      "DishesOut": {
+        "properties": {
+          "hall": {
+            "type": "string",
+            "title": "Hall"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": [
+              "live",
+              "seeded"
+            ],
+            "title": "Data Source"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DishRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Headline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plates_seen": {
+            "type": "integer",
+            "title": "Plates Seen",
+            "default": 0
+          },
+          "unmatched_kg": {
+            "type": "number",
+            "title": "Unmatched Kg",
+            "default": 0
+          },
+          "assumptions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Assumptions"
+          },
+          "stations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stations"
+          },
+          "meals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Meals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hall",
+          "start",
+          "end",
+          "data_source",
+          "rows"
+        ],
+        "title": "DishesOut",
+        "description": "``GET /dashboard/dishes``: the sortable table and the popularity scatter."
+      },
+      "FoodCategory": {
+        "type": "string",
+        "enum": [
+          "rice_grains",
+          "pasta_plain",
+          "pasta_saucy",
+          "soup_stew",
+          "mashed_puree",
+          "beans_lentils",
+          "poultry",
+          "red_meat",
+          "fish_seafood",
+          "eggs",
+          "tofu_plant_protein",
+          "raw_vegetables",
+          "cooked_vegetables",
+          "leafy_salad",
+          "potatoes_fried_roasted",
+          "bread",
+          "pizza_burger_sandwich",
+          "baked_dessert",
+          "ice_cream",
+          "yogurt_pudding",
+          "cut_fruit"
+        ],
+        "title": "FoodCategory",
+        "description": "Coarse food classes (one per row of the spec's density table)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Headline": {
+        "properties": {
+          "kg_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg Low"
+          },
+          "kg_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg High"
+          },
+          "serving_comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServingComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kg_wasted": {
+            "type": "number",
+            "title": "Kg Wasted"
+          },
+          "waste_rate_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waste Rate Percent",
+            "description": "Mean percent left across matched regions"
+          },
+          "est_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Est Cost Usd",
+            "description": "From editable cost factors; an assumption, say so"
+          },
+          "est_co2e_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Est Co2E Kg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kg_wasted"
+        ],
+        "title": "Headline",
+        "description": "The three numbers at the top of the Today screen."
+      },
+      "ItemRole": {
+        "type": "string",
+        "enum": [
+          "dish",
+          "component",
+          "condiment",
+          "notice"
+        ],
+        "title": "ItemRole",
+        "description": "What a menu entry is, from the camera's point of view."
+      },
+      "MealMenu": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MenuItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "items"
+        ],
+        "title": "MealMenu"
+      },
+      "MenuItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "stations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stations"
+          },
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergens"
+          },
+          "preferences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preferences"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FoodCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Source"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "key",
+          "role",
+          "stations"
+        ],
+        "title": "MenuItem",
+        "description": "A cleaned menu entry, merged across the stations that list it."
+      },
+      "PlateAccepted": {
+        "properties": {
+          "plate_id": {
+            "type": "string",
+            "title": "Plate Id"
+          },
+          "regions_stored": {
+            "type": "integer",
+            "title": "Regions Stored"
+          },
+          "regions_for_review": {
+            "type": "integer",
+            "title": "Regions For Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plate_id",
+          "regions_stored",
+          "regions_for_review"
+        ],
+        "title": "PlateAccepted"
+      },
+      "PlateImageAccepted": {
+        "properties": {
+          "plate_id": {
+            "type": "string",
+            "title": "Plate Id"
+          },
+          "regions_stored": {
+            "type": "integer",
+            "title": "Regions Stored"
+          },
+          "regions_for_review": {
+            "type": "integer",
+            "title": "Regions For Review"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/RegionIn"
+            },
+            "type": "array",
+            "title": "Regions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plate_id",
+          "regions_stored",
+          "regions_for_review",
+          "regions"
+        ],
+        "title": "PlateImageAccepted",
+        "description": "``POST /plates/image``: the stored counts plus what was measured, for the capture page."
+      },
+      "PlateIn": {
+        "properties": {
+          "plate_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Plate Id",
+            "description": "Random id; not derived from anything personal"
+          },
+          "meal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Meal"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At",
+            "description": "The server rounds this down to 15 minutes before storing"
+          },
+          "regions": {
+            "items": {
+              "$ref": "#/components/schemas/RegionIn"
+            },
+            "type": "array",
+            "title": "Regions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plate_id",
+          "meal",
+          "observed_at",
+          "regions"
+        ],
+        "title": "PlateIn",
+        "description": "Body of ``POST /plates``: one returned plate and its regions."
+      },
+      "RegionIn": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/FoodCategory"
+          },
+          "dish_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dish Name",
+            "description": "None means unknown (goes to review)"
+          },
+          "match_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Score"
+          },
+          "volume_ml": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Volume Ml"
+          },
+          "grams": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Grams"
+          },
+          "grams_low": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Grams Low"
+          },
+          "grams_high": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Grams High"
+          },
+          "percent_left": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Left",
+            "description": "Volume left over the dish's reference volume; may exceed 100"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "volume_ml",
+          "grams",
+          "grams_low",
+          "grams_high"
+        ],
+        "title": "RegionIn",
+        "description": "One measured food region on a plate, as the rig reports it."
+      },
+      "ReportOut": {
+        "properties": {
+          "hall": {
+            "type": "string",
+            "title": "Hall"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": [
+              "live",
+              "seeded"
+            ],
+            "title": "Data Source"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/Headline"
+          },
+          "top_dishes": {
+            "items": {
+              "$ref": "#/components/schemas/DishRow"
+            },
+            "type": "array",
+            "title": "Top Dishes"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DishRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "plates_seen": {
+            "type": "integer",
+            "title": "Plates Seen",
+            "default": 0
+          },
+          "unmatched_kg": {
+            "type": "number",
+            "title": "Unmatched Kg",
+            "default": 0
+          },
+          "week_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week End"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          },
+          "methods_note": {
+            "type": "string",
+            "title": "Methods Note"
+          },
+          "assumptions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Assumptions",
+            "description": "Cost and CO2e factors, named and explained"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hall",
+          "week_start",
+          "data_source",
+          "headline",
+          "top_dishes",
+          "methods_note",
+          "assumptions"
+        ],
+        "title": "ReportOut",
+        "description": "``GET /report/weekly``: everything the USG page and its PDF show."
+      },
+      "ServingComparison": {
+        "properties": {
+          "served_kg": {
+            "type": "number",
+            "title": "Served Kg"
+          },
+          "servings": {
+            "type": "integer",
+            "title": "Servings"
+          },
+          "returned_percent": {
+            "type": "number",
+            "title": "Returned Percent"
+          },
+          "returned_percent_low": {
+            "type": "number",
+            "title": "Returned Percent Low"
+          },
+          "returned_percent_high": {
+            "type": "number",
+            "title": "Returned Percent High"
+          },
+          "data_source": {
+            "type": "string",
+            "const": "seeded",
+            "title": "Data Source",
+            "default": "seeded"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "default": "Identified leftovers / simulated servings; unmatched food is excluded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "served_kg",
+          "servings",
+          "returned_percent",
+          "returned_percent_low",
+          "returned_percent_high"
+        ],
+        "title": "ServingComparison",
+        "description": "Matched leftover mass / simulated served mass, for a complete seeded cohort only."
+      },
+      "TodayOut": {
+        "properties": {
+          "hall": {
+            "type": "string",
+            "title": "Hall"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "meal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meal"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": [
+              "live",
+              "seeded"
+            ],
+            "title": "Data Source"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/Headline"
+          },
+          "top_dishes": {
+            "items": {
+              "$ref": "#/components/schemas/DishRow"
+            },
+            "type": "array",
+            "title": "Top Dishes",
+            "description": "Up to 5, most kilograms wasted first"
+          },
+          "plates_seen": {
+            "type": "integer",
+            "title": "Plates Seen"
+          },
+          "regions_for_review": {
+            "type": "integer",
+            "title": "Regions For Review"
+          },
+          "assumptions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Assumptions",
+            "description": "Cost and CO2e factors behind the headline estimates, named and explained"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hall",
+          "day",
+          "meal",
+          "data_source",
+          "headline",
+          "top_dishes",
+          "plates_seen",
+          "regions_for_review"
+        ],
+        "title": "TodayOut",
+        "description": "``GET /dashboard/today``."
+      },
+      "TrendPoint": {
+        "properties": {
+          "kg_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg Low"
+          },
+          "kg_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg High"
+          },
+          "serving_comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServingComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          },
+          "kg_wasted": {
+            "type": "number",
+            "title": "Kg Wasted"
+          },
+          "waste_rate_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waste Rate Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "kg_wasted",
+          "waste_rate_percent"
+        ],
+        "title": "TrendPoint",
+        "description": "One week of one series; ``kg_wasted`` and ``waste_rate_percent`` as in ``Headline``."
+      },
+      "TrendsOut": {
+        "properties": {
+          "hall": {
+            "type": "string",
+            "title": "Hall"
+          },
+          "data_source": {
+            "type": "string",
+            "enum": [
+              "live",
+              "seeded"
+            ],
+            "title": "Data Source"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TrendPoint"
+            },
+            "type": "array",
+            "title": "Weeks"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "dishes": {
+            "items": {
+              "$ref": "#/components/schemas/DishWeeks"
+            },
+            "type": "array",
+            "title": "Dishes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hall",
+          "data_source",
+          "weeks"
+        ],
+        "title": "TrendsOut",
+        "description": "``GET /dashboard/trends``."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
