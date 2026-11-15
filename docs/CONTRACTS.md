@@ -10,15 +10,21 @@ types are generated from `/openapi.json`.
 | --- | --- | --- | --- | --- |
 | `GET /health` | none | | `{status, hall}` | done |
 | `GET /menu/{date}` | none | | `DailyMenu` (`menu/models.py`) | done |
-| `POST /plates` | device token | `PlateIn` | `PlateAccepted` | returns 501 |
-| `POST /plates/image` | device token | multipart image, `meal` | `PlateAccepted` | not started; the phone `/capture` page uses it |
-| `GET /dashboard/today?meal=&day=` | staff | | `TodayOut` | not started |
-| `GET /dashboard/dishes?start=&end=&meal=` | staff | | `DishesOut` | not started |
-| `GET /dashboard/dishes/{dish_name}` | staff | | `DishDetailOut` | not started |
-| `GET /dashboard/trends?weeks=` | staff | | `TrendsOut` | not started |
-| `GET /report/weekly?week_start=` | public, aggregated | | `ReportOut` | not started |
+| `POST /plates` | device token | `PlateIn` | `PlateAccepted` | done; idempotent on `plate_id` |
+| `POST /plates/image` | device token | multipart `image`, `meal` | `PlateImageAccepted` (counts + measured `regions`) | done; used by the rig loop (`python -m capture`) and the phone page; 422 with a reason when the photo can't be measured (nothing stored), 503 until the model is installed |
+| `GET /dashboard/today?meal=&day=` | staff | | `TodayOut` (now with `assumptions`) | done; `day` defaults to today in hall time |
+| `GET /dashboard/dishes?start=&end=&meal=` | staff | | `DishesOut` | done; default last 7 days, both ends included |
+| `GET /dashboard/dishes/{dish_name}?start=&end=&meal=` | staff | | `DishDetailOut` | done; default last 28 days; 404 if no plates |
+| `GET /dashboard/trends?weeks=` | staff | | `TrendsOut` | done; 1-52 weeks (default 8); empty weeks are left out, not zero |
+| `GET /report/weekly?week_start=` | public, aggregated | | `ReportOut` | done; any date maps to its Monday; default last week |
 
-Review queue (`GET /review`, `POST /review/{id}`) is not specified yet.
+Auth: device = `Authorization: Bearer $LEFTOVER_DEVICE_TOKEN`; staff =
+`Authorization: Bearer $LEFTOVER_STAFF_TOKEN`. An unset token refuses every request.
+Keep the staff token out of `NEXT_PUBLIC_*` variables: call staff endpoints from Next
+server routes, or accept the exposure for the demo only.
+
+Review queue (`GET /review`, `POST /review/{id}`) is not specified yet; it should show
+the matcher's `MatchDetail.reason` and candidate probabilities (`menu/matcher.py`).
 
 ## Rules every lane follows
 

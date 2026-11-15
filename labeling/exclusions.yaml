@@ -1,0 +1,12 @@
+# Photos left out of the training/validation dataset after looking at the autolabel review
+# grid (notebooks/colab_autolabel.ipynb). Photos where a named food got no mask are excluded
+# automatically by labeling.autolabel.missing_items and are not listed here.
+# village-v1 was trained on the dataset built with exactly this list.
+manual:
+  asparagus+carrots+hotdog+short-ribs_p1_half_01.jpg: knife labelled as cooked_vegetables
+  asparagus+short-ribs_p1_scraps_01.jpg: fork labelled as food
+  burger_p1_scraps_01.jpg: crumpled wrapper inside the burger mask
+  burger_p1_scraps-crop_01.jpg: crumpled wrapper inside the burger mask
+  asparagus+chicken+rice-pilaf_p1_full_01.jpg: neighbouring plate taken as the plate
+  fries_p4_half_03.jpg: several fries unmasked
+  fries_p4_half_05.jpg: one fry unmasked

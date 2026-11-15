@@ -1,13 +1,15 @@
 # Training configuration for the segmentation student. These are starting
-# choices, not tuned results; the committed copy must always be the one that
-# produced the numbers in eval/results/.
+# choices, not tuned results. notebooks/colab_train_village.ipynb passes model, data,
+# project, name, epochs and (for village-v2) imgsz=1024 on top of this file; Ultralytics
+# saves every run's complete arguments as <run>/args.yaml next to its weights.
 model: yolo26n-seg.pt        # exists in ultralytics 8.4.x; weights download on first use
 data: data/datasets/leftover/data.yaml
 imgsz: 640
 epochs: 100
-batch: 16
-patience: 20
+batch: 8
+patience: 25
 seed: 0
+workers: 2
 # Plates are seen from straight above, so any rotation or flip is realistic.
 degrees: 180.0
 flipud: 0.5

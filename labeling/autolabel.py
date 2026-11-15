@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import cv2
 import numpy as np
 import yaml
 from numpy.typing import NDArray
@@ -107,38 +108,89 @@ def overlap_fraction(inner: Mask, outer: Mask) -> float:
     return float((inner & outer).sum()) / area if area else 0.0
 
 
+def filled(mask: Mask) -> Mask:
+    """Convex hull of ``mask``: the whole plate disc even where SAM left holes under the food."""
+    ys, xs = np.nonzero(mask)
+    if len(xs) < 3:
+        return mask
+    hull = cv2.convexHull(np.stack([xs, ys], axis=1).astype(np.int32))
+    out = np.zeros(mask.shape, dtype=np.uint8)
+    cv2.fillConvexPoly(out, hull, 1)
+    return out.astype(bool)
+
+
 def filter_labels(
     labels: list[LabeledMask],
     *,
     min_on_plate: float = 0.5,
     max_plate_fraction: float = 0.92,
     min_area_px: int = 64,
+    max_bowl_on_plate: float = 0.5,
+    max_duplicate_overlap: float = 0.8,
 ) -> list[LabeledMask]:
     """Clean raw detections into training labels.
 
-    * keep only the best ``plate``;
-    * drop food masks that are mostly off the plate/bowl (cutlery, napkins, the table);
+    * keep only the best ``plate`` (score x area, so a high-scoring sliver or a plate in the
+      corner of the frame cannot beat the real one);
+    * drop food masks that are mostly off the plate/bowl (cutlery, napkins, the table). The
+      test uses the plate's convex hull, because SAM often leaves holes where food sits;
+    * drop a ``bowl`` that sits mostly on the plate: that is a food pile DINO called a bowl;
     * drop a food mask that is the whole plate (Grounding DINO often boxes the plate for
       "fries");
+    * drop a food mask that mostly overlaps a higher-scoring mask of the same class (the same
+      spears boxed twice), so no pixel carries two instances;
     * drop slivers smaller than ``min_area_px``.
     """
     labels = [m for m in labels if int(m.mask.sum()) >= min_area_px]
-    plates = sorted((m for m in labels if m.class_name == PLATE), key=lambda m: -m.score)
-    bowls = [m for m in labels if m.class_name == BOWL]
+    plates = sorted(
+        (m for m in labels if m.class_name == PLATE),
+        key=lambda m: -m.score * int(m.mask.sum()),
+    )
+    plate_region = filled(plates[0].mask) if plates else None
+    bowls = [
+        m
+        for m in labels
+        if m.class_name == BOWL
+        and (plate_region is None or overlap_fraction(m.mask, plate_region) < max_bowl_on_plate)
+    ]
     vessels = plates[:1] + bowls
+    regions = [filled(v.mask) for v in vessels]
     out = list(vessels)
-    for m in labels:
+    foods: list[LabeledMask] = []
+    for m in sorted(labels, key=lambda m: -m.score):
         if m.class_name in STRUCTURE_PHRASES:
             continue
         if not vessels:
             continue  # no plate found: a food mask has nothing to be validated against
-        best_on = max(overlap_fraction(m.mask, v.mask) for v in vessels)
+        best_on = max(overlap_fraction(m.mask, r) for r in regions)
         if best_on < min_on_plate:
             continue
-        if any(int(m.mask.sum()) > max_plate_fraction * int(v.mask.sum()) for v in vessels):
+        if any(int(m.mask.sum()) > max_plate_fraction * int(r.sum()) for r in regions):
             continue
-        out.append(m)
-    return out
+        if any(
+            k.class_name == m.class_name
+            and max(overlap_fraction(m.mask, k.mask), overlap_fraction(k.mask, m.mask))
+            > max_duplicate_overlap
+            for k in foods
+        ):
+            continue
+        foods.append(m)
+    return out + foods
+
+
+def missing_items(item: str, labels: list[LabeledMask], items: dict[str, PilotItem]) -> list[str]:
+    """Slugs named in ``item`` whose food class got no mask (an incompletely labelled photo).
+
+    Training on such a photo teaches the model that the missed food is background, so the
+    notebook leaves these photos out. Two slugs sharing a class (asparagus and carrots) are
+    satisfied by one mask of that class.
+    """
+    found = {m.class_name for m in labels}
+    return [
+        slug
+        for slug in split_items(item)
+        if slug != EMPTY_ITEM and items[slug].category.value not in found
+    ]
 
 
 def to_yolo_seg_lines(labels: list[LabeledMask]) -> list[str]:
@@ -184,9 +236,10 @@ class Autolabeler:
 
     def __init__(
         self,
-        dino_id: str = "IDEA-Research/grounding-dino-tiny",
+        dino_id: str = "IDEA-Research/grounding-dino-base",
         sam_id: str = "facebook/sam2.1-hiera-small",
         box_threshold: float = 0.30,
+        food_threshold: float = 0.25,
         text_threshold: float = 0.25,
         device: str | None = None,
     ) -> None:
@@ -200,15 +253,19 @@ class Autolabeler:
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.box_threshold = box_threshold
+        self.food_threshold = food_threshold
         self.text_threshold = text_threshold
         self._dino_proc = AutoProcessor.from_pretrained(dino_id)
         self._dino = AutoModelForZeroShotObjectDetection.from_pretrained(dino_id).to(self.device)
         self._sam_proc = Sam2Processor.from_pretrained(sam_id)
         self._sam = Sam2Model.from_pretrained(sam_id).to(self.device)
 
-    def _detect(self, pil_image: Any, prompt: str) -> tuple[list[Box], list[float], list[str]]:
+    def _detect(
+        self, pil_image: Any, prompt: str, threshold: float | None = None
+    ) -> tuple[list[Box], list[float], list[str]]:
         import torch
 
+        thr = self.box_threshold if threshold is None else threshold
         inputs = self._dino_proc(images=pil_image, text=prompt, return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self._dino(**inputs)
@@ -218,11 +275,11 @@ class Autolabeler:
         }
         try:
             res = self._dino_proc.post_process_grounded_object_detection(
-                outputs, inputs.input_ids, threshold=self.box_threshold, **kwargs
+                outputs, inputs.input_ids, threshold=thr, **kwargs
             )[0]
         except TypeError:  # older transformers call it box_threshold
             res = self._dino_proc.post_process_grounded_object_detection(
-                outputs, inputs.input_ids, box_threshold=self.box_threshold, **kwargs
+                outputs, inputs.input_ids, box_threshold=thr, **kwargs
             )[0]
         texts = res.get("text_labels", res.get("labels", []))
         boxes: list[Box] = [(b[0], b[1], b[2], b[3]) for b in res["boxes"].cpu().tolist()]
@@ -247,14 +304,16 @@ class Autolabeler:
         """Plate, bowl and food masks for one photo whose dish is ``item``."""
         from PIL import Image
 
-        prompt, lookup = build_prompt(item, items)
+        _, lookup = build_prompt(item, items)
         pil = Image.fromarray(image_bgr[:, :, ::-1])
-        boxes, scores, texts = self._detect(pil, prompt)
+        # One single-phrase DINO pass per class: a prompt naming several foods weakens each
+        # of them, and a single phrase means the class is known without reading DINO's text
+        # labels (which can be clipped, blank, or a different length from the boxes).
         found: list[tuple[Box, float, str]] = []
-        for b, sc, t in zip(boxes, scores, texts, strict=True):
-            cls = resolve_label(t, lookup)
-            if cls is not None:
-                found.append((b, sc, cls))
+        for phrase, cls in lookup.items():
+            thr = self.box_threshold if phrase in STRUCTURE_PHRASES else self.food_threshold
+            boxes, scores, _ = self._detect(pil, f"{phrase} .", thr)
+            found.extend((b, sc, cls) for b, sc in zip(boxes, scores, strict=True))
         if not found:
             return []
         masks = self._segment(pil, [b for b, _, _ in found])

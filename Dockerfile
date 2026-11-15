@@ -13,6 +13,8 @@ COPY menu menu
 COPY analytics analytics
 COPY api api
 COPY eval eval
-RUN pip install --no-cache-dir .
+# vision: OpenCV (plate scale, image decode) and ONNX Runtime for POST /plates/image.
+# DA3 and SigLIP (torch) are large; install them in the image only when serving photos.
+RUN pip install --no-cache-dir ".[vision]"
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

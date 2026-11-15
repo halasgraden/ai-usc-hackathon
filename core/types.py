@@ -56,7 +56,7 @@ SEG_CLASSES: tuple[str, ...] = ("plate", "bowl", *(c.value for c in FoodCategory
 
 @dataclass(frozen=True, slots=True)
 class ScaleCalibration:
-    """Pixel-to-centimetre scale recovered from the ArUco marker in a frame."""
+    """Pixel-to-centimetre scale recovered from the plate (or an ArUco marker on the bench)."""
 
     cm_per_px: float
 

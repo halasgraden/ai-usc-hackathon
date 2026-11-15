@@ -68,9 +68,25 @@ def test_plates_refuses_everything_when_no_token_is_configured(tmp_path: Path) -
     assert app.post("/plates", headers={"Authorization": "Bearer "}).status_code == 401
 
 
-def test_plates_is_not_implemented_yet(client: TestClient) -> None:
-    response = client.post("/plates", headers={"Authorization": f"Bearer {TOKEN}"})
-    assert response.status_code == 501
+def test_plate_image_upload_needs_the_model_installed(client: TestClient) -> None:
+    files = {"image": ("plate.png", _png(), "image/png")}
+    response = client.post(
+        "/plates/image",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        files=files,
+        data={"meal": "Dinner"},
+    )
+    assert response.status_code == 503
+    assert "model not found" in response.json()["detail"]
+
+
+def _png() -> bytes:
+    import cv2
+    import numpy as np
+
+    ok, buf = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    assert ok
+    return bytes(buf)
 
 
 def test_timestamps_round_down_to_15_minutes() -> None:

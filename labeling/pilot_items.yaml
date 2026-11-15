@@ -6,7 +6,7 @@ fries:
   phrase: french fries
 chicken:
   category: poultry
-  phrase: roasted chicken
+  phrase: chicken
 rice-pilaf:
   category: rice_grains
   phrase: cooked rice
@@ -33,4 +33,4 @@ grapes:
   phrase: grapes
 short-ribs:
   category: red_meat
-  phrase: braised beef short ribs
+  phrase: braised beef

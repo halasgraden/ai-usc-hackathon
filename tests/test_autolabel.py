@@ -10,6 +10,7 @@ from labeling.autolabel import (
     build_prompt,
     filter_labels,
     load_pilot_items,
+    missing_items,
     overlap_fraction,
     parse_photo_name,
     resolve_label,
@@ -87,6 +88,71 @@ def test_filter_drops_food_off_plate_whole_plate_and_slivers() -> None:
     assert [m.class_name for m in filter_labels(labels)] == ["plate"]
 
 
+def test_filter_prefers_the_big_plate_over_a_high_scoring_sliver() -> None:
+    labels = [
+        LabeledMask("plate", 0.64, _rect(0, 0, 90, 8)),  # strip at the frame edge
+        LabeledMask("plate", 0.52, _rect(10, 20, 90, 95)),  # the real plate
+        LabeledMask("rice_grains", 0.7, _rect(30, 40, 60, 70)),
+    ]
+    kept = filter_labels(labels)
+    assert [m.class_name for m in kept] == ["plate", "rice_grains"]
+    assert kept[0].score == 0.52
+
+
+def test_filter_keeps_food_when_the_plate_mask_has_a_hole_under_it() -> None:
+    ring = _rect(10, 10, 90, 90)
+    ring[30:70, 30:70] = False  # SAM segmented the ceramic only, not the food on it
+    labels = [
+        LabeledMask("plate", 0.8, ring),
+        LabeledMask("poultry", 0.8, _rect(35, 35, 65, 65)),
+    ]
+    assert [m.class_name for m in filter_labels(labels)] == ["plate", "poultry"]
+
+
+def test_filter_drops_a_bowl_on_the_plate_and_keeps_the_food_it_covered() -> None:
+    labels = [
+        LabeledMask("plate", 0.8, _rect(10, 10, 90, 90)),
+        LabeledMask("bowl", 0.5, _rect(30, 30, 60, 60)),  # the rice pile, called a bowl
+        LabeledMask("rice_grains", 0.7, _rect(31, 31, 59, 59)),
+    ]
+    assert [m.class_name for m in filter_labels(labels)] == ["plate", "rice_grains"]
+
+
+def test_filter_keeps_a_real_bowl_beside_the_plate() -> None:
+    labels = [
+        LabeledMask("plate", 0.8, _rect(0, 0, 50, 50)),
+        LabeledMask("bowl", 0.6, _rect(55, 55, 95, 95)),
+    ]
+    assert [m.class_name for m in filter_labels(labels)] == ["plate", "bowl"]
+
+
+def test_filter_drops_duplicate_masks_of_the_same_class_only() -> None:
+    labels = [
+        LabeledMask("plate", 0.8, _rect(5, 5, 95, 95)),
+        LabeledMask("cooked_vegetables", 0.4, _rect(20, 20, 50, 50)),
+        LabeledMask("cooked_vegetables", 0.5, _rect(21, 21, 50, 50)),  # same spears again
+        LabeledMask("poultry", 0.6, _rect(22, 22, 48, 48)),  # other class: kept
+        LabeledMask("cooked_vegetables", 0.3, _rect(60, 60, 80, 80)),  # another spear: kept
+    ]
+    kept = filter_labels(labels)
+    veg = [m.score for m in kept if m.class_name == "cooked_vegetables"]
+    assert veg == [0.5, 0.3]
+    assert "poultry" in [m.class_name for m in kept]
+
+
+def test_missing_items_names_foods_with_no_mask() -> None:
+    items = load_pilot_items()
+    labels = [
+        LabeledMask("plate", 0.8, _rect(0, 0, 9, 9)),
+        LabeledMask("rice_grains", 0.7, _rect(1, 1, 5, 5)),
+    ]
+    assert missing_items("chicken+rice-pilaf", labels, items) == ["chicken"]
+    assert missing_items("rice-pilaf", labels, items) == []
+    assert missing_items("empty", labels, items) == []
+    veg = [LabeledMask("cooked_vegetables", 0.5, _rect(1, 1, 5, 5))]
+    assert missing_items("asparagus+carrots", veg, items) == []
+
+
 def test_filter_drops_food_when_no_plate_was_found() -> None:
     assert filter_labels([LabeledMask("poultry", 0.9, _rect(30, 30, 60, 60))]) == []
 
@@ -111,8 +177,8 @@ def test_mixed_plate_prompt_asks_for_every_food() -> None:
     assert split_items("asparagus+chicken") == ["asparagus", "chicken"]
     assert split_items("empty") == ["empty"]
     prompt, lookup = build_prompt("asparagus+chicken", ITEMS)
-    assert prompt == "plate . bowl . asparagus . roasted chicken ."
-    assert lookup["asparagus"] == "cooked_vegetables" and lookup["roasted chicken"] == "poultry"
+    assert prompt == "plate . bowl . asparagus . chicken ."
+    assert lookup["asparagus"] == "cooked_vegetables" and lookup["chicken"] == "poultry"
     with pytest.raises(KeyError):
         build_prompt("fries+lasagna", ITEMS)
 

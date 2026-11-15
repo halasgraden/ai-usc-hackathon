@@ -64,6 +64,12 @@ class PlateAccepted(BaseModel):
     regions_for_review: int
 
 
+class PlateImageAccepted(PlateAccepted):
+    """``POST /plates/image``: the stored counts plus what was measured, for the capture page."""
+
+    regions: list[RegionIn]
+
+
 class Headline(BaseModel):
     """The three numbers at the top of the Today screen."""
 
@@ -98,6 +104,10 @@ class TodayOut(BaseModel):
     top_dishes: list[DishRow] = Field(description="Up to 5, most kilograms wasted first")
     plates_seen: int
     regions_for_review: int
+    assumptions: dict[str, str] = Field(
+        default_factory=dict,
+        description="Cost and CO2e factors behind the headline estimates, named and explained",
+    )
 
 
 class DishesOut(BaseModel):

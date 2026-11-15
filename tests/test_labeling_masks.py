@@ -52,7 +52,7 @@ def test_box_mask_lands_where_the_box_says() -> None:
     box_mask = np.ones((10, 20), dtype=bool)  # a crop twice as wide as tall
     full = place_box_mask(box_mask, (0.25, 0.5, 0.5, 0.25), width=80, height=40)
     ys, xs = np.nonzero(full)
-    assert (xs.min(), xs.max(), ys.min(), ys.max()) == (20, 59, 20, 29)
+    assert (int(xs.min()), int(xs.max()), int(ys.min()), int(ys.max())) == (20, 59, 20, 29)
     assert full.sum() == 40 * 10
 
 
