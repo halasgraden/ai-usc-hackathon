@@ -25,7 +25,7 @@ class Settings:
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
     """Browser origins allowed to call the API (the Next.js dashboard)."""
     cost_factors: CostFactors = field(default_factory=CostFactors)
-    seg_model: Path = Path("models/village-v1.onnx")
+    seg_model: Path = Path("models/village-v2.onnx")
     """ONNX segmentation model for ``POST /plates/image``."""
     focal_px: float | None = None
     """Calibrated focal length of the rig camera in frame pixels; None uses the depth model's."""
@@ -42,7 +42,7 @@ class Settings:
             timezone=os.environ.get("LEFTOVER_TIMEZONE", "America/Los_Angeles"),
             cors_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),
             cost_factors=CostFactors.from_env(),
-            seg_model=Path(os.environ.get("LEFTOVER_SEG_MODEL", "models/village-v1.onnx")),
+            seg_model=Path(os.environ.get("LEFTOVER_SEG_MODEL", "models/village-v2.onnx")),
             focal_px=float(os.environ["LEFTOVER_FOCAL_PX"])
             if os.environ.get("LEFTOVER_FOCAL_PX")
             else None,

@@ -33,7 +33,7 @@ plate waste per dish. This fills that gap.
 | `augment/dataset.py` composites into the training split only | Working, tested |
 | `eval/segmentation.py` held-out per-class mask AP, written to `eval/results/` | Working, tested; first real run pending |
 | `vision/infer.py` ONNX decode, NMS, masks | Working, tested; checked on real photos with the Voxel51 baseline |
-| `vision/train.py`, `vision/export_onnx.py` | `village-v1` trained on our Village photos (`notebooks/colab_train_village.ipynb`); 1024 px `village-v2` training |
+| `vision/train.py`, `vision/export_onnx.py` | `village-v2` (1024 px) trained on our Village photos and shipped; `village-v1` (640 px) kept for comparison (`notebooks/colab_train_village.ipynb`) |
 | `capture/` source, plate trigger, YuNet face guard, rig loop `python -m capture` | Tested on synthetic frames and against the API with a fake pipeline; trigger thresholds untuned; face guard fails closed and the real YuNet model has not been run yet |
 | `api/` | All endpoints in `docs/CONTRACTS.md` work on SQLite; `POST /plates/image` runs segment, merge per class, depth to ml, grams, menu match (tested with fake models; needs the exported ONNX model, DA3 and SigLIP installed to run for real) |
 | `analytics/` per-dish aggregates, trends, high-waste flags; `python -m api.seed` demo data (labelled `seeded`) | Working, tested |
@@ -45,22 +45,43 @@ Every number here is copied from a file that an `eval/` script wrote under `eval
 nothing is typed by hand. Models, limits and licences: [MODEL_CARD.md](MODEL_CARD.md).
 The photos, labelling and splits: [DATA_CARD.md](DATA_CARD.md).
 
-#### Segmentation: village-v1 (`eval/results/village-v1.json`)
+#### Segmentation: village-v2, the shipped model (`eval/results/village-v2.json`)
 
-Held-out plates, mask mAP50 0.755, mask mAP50-95 0.545.
+Held-out plates at 1024 px, mask mAP50 0.756, mask mAP50-95 0.615.
 
 | Class | Val images | Val instances | Precision | Recall | Mask AP50 | Mask AP50-95 |
 |---|---:|---:|---:|---:|---:|---:|
-| plate | 19 | 19 | 0.965 | 1.000 | 0.995 | 0.950 |
-| bowl * | 2 | 2 | 1.000 | 0.000 | 0.745 | 0.124 |
-| poultry * | 3 | 3 | 1.000 | 0.906 | 0.995 | 0.995 |
-| cooked_vegetables | 3 | 12 | 0.537 | 0.500 | 0.379 | 0.185 |
-| potatoes_fried_roasted | 12 | 26 | 0.498 | 0.692 | 0.664 | 0.470 |
+| plate | 19 | 19 | 0.954 | 1.000 | 0.995 | 0.954 |
+| bowl * | 2 | 2 | 1.000 | 0.000 | 0.495 | 0.198 |
+| poultry * | 3 | 3 | 1.000 | 0.900 | 0.995 | 0.995 |
+| cooked_vegetables | 3 | 12 | 0.658 | 0.583 | 0.623 | 0.371 |
+| potatoes_fried_roasted | 12 | 26 | 0.559 | 0.654 | 0.669 | 0.556 |
 
 \* fewer than 5 validation instances: too few to trust.
 Classes with no validation instances are not listed; they have no held-out score.
 
+#### v1 (640 px) vs v2 (1024 px), same held-out photos (`python -m eval.compare village-v1 village-v2`)
+
+| | village-v1 | village-v2 (1024 px) |
+|---|---:|---:|
+| Mask mAP50, all classes | 0.755 | 0.756 |
+| Mask mAP50-95, all classes | 0.545 | 0.615 |
+| plate AP50 | 0.995 | 0.995 |
+| plate AP50-95 | 0.950 | 0.954 |
+| bowl * AP50 | 0.745 | 0.495 |
+| bowl * AP50-95 | 0.124 | 0.198 |
+| poultry * AP50 | 0.995 | 0.995 |
+| poultry * AP50-95 | 0.995 | 0.995 |
+| cooked_vegetables AP50 | 0.379 | 0.623 |
+| cooked_vegetables AP50-95 | 0.185 | 0.371 |
+| potatoes_fried_roasted AP50 | 0.664 | 0.669 |
+| potatoes_fried_roasted AP50-95 | 0.470 | 0.556 |
+
+\* fewer than 5 validation instances in at least one run: too few to trust.
+
 How to read it:
+* Training at 1024 px instead of 640 px is the one change between v1 and v2. It mostly helped
+  thin foods: asparagus spears (`cooked_vegetables`) and tighter fries masks (AP50-95).
 * The validation set is 19 real photos from three whole plates held out by plate
   (`asparagus+chicken_p1`, `empty_p1`, `fries_p4`); no photo of those plates, and no
   composite made from them, was trained on.

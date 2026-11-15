@@ -12,14 +12,14 @@ quality number exists yet. When this card says "not measured", nothing was measu
 
 | Role | Model | Where it runs | Trained by us? | Run on real Village photos? |
 | --- | --- | --- | --- | --- |
-| Segmentation (student) | YOLO26n-seg, run `village-v1` | Live, ONNX Runtime (`vision/infer.py`) | Fine-tuned | Yes. Evaluated on 19 held-out photos (below) |
+| Segmentation (student) | YOLO26n-seg, run `village-v2` (1024 px); `village-v1` (640 px) for comparison | Live, ONNX Runtime (`vision/infer.py`) | Fine-tuned | Yes. Evaluated on 19 held-out photos (below) |
 | Auto-label teacher: boxes | Grounding DINO base (`IDEA-Research/grounding-dino-base`) | Offline, Colab GPU (`labeling/autolabel.py`) | No | Yes. Made the training labels |
 | Auto-label teacher: masks | SAM 2.1 Hiera small (`facebook/sam2.1-hiera-small`) | Offline, Colab GPU | No | Yes. Made the training labels |
 | Depth | Depth Anything 3 Small (`depth-anything/DA3-SMALL`); `DA3METRIC-LARGE` optional | Live (`depth/estimator.py`) | No | **No. It has never loaded weights or run** |
 | Menu matcher | SigLIP 2 ViT-B/16 224 px (`google/siglip2-base-patch16-224`) | Live (`menu/matcher.py`) | No | **No. Tested only with a fake embedder** |
 | Grams | Volume x bulk density (`portion/grams.py`, `portion/densities.yaml`) | Live | Lookup table, not a learned model | Never checked against a scale |
 
-### Segmentation student: `village-v1`
+### Segmentation student: `village-v2` (and `village-v1`)
 
 - **Architecture**: Ultralytics YOLO26n-seg (nano instance segmentation).
 - **Classes**: 23, `core.types.SEG_CLASSES`. These are `plate`, `bowl` and the 21 coarse
@@ -30,16 +30,18 @@ quality number exists yet. When this card says "not measured", nothing was measu
   (`notebooks/colab_train.ipynb`). That checkpoint started from Ultralytics'
   pretrained `yolo26n-seg.pt`. No held-out number for `voxel51-v0` is committed: not measured.
 - **Fine-tuning** (`notebooks/colab_train_village.ipynb`, `vision/configs/yolo26n_seg.yaml`):
-  640 px input, `epochs=100`, `patience=25`, `batch=8`, seed 0. Rotation 180 degrees, up/down
+  `epochs=100`, `patience=25`, `batch=8`, seed 0; `village-v2` at 1024 px input, `village-v1` at 640 px. Rotation 180 degrees, up/down
   and left/right flips, mosaic, mixup 0.1, Ultralytics copy-paste 0.5, brightness (`hsv_v`) 0.4.
   The notebook's `patience` and `batch` override the config file's values (20 and 16).
-  Training stopped early at epoch 61. The best epoch was 36. It took about 16 minutes on a Colab T4.
+  `village-v1` stopped early at epoch 61 (best epoch 36, about 16 minutes on a Colab T4);
+  `village-v2` stopped at epoch 47 (best epoch 22, about 18 minutes).
 - **Training data**: 66 real Village photos plus 200 copy-paste composites. See [DATA_CARD.md](DATA_CARD.md).
-- **Deployment**: exported to ONNX at 640 px (`vision/export_onnx.py`). On the rig it runs
+- **Deployment**: `village-v2` exported to ONNX at its 1024 px training size (`vision/export_onnx.py`). On the rig it runs
   with ONNX Runtime only, without PyTorch. Defaults are confidence 0.25, NMS IoU 0.7 and mask
   threshold 0.5 (`vision/infer.py`). `api/pipeline.py` merges all masks of one class on a plate
   into one region before measuring.
-- **In progress**: `village-v2` is training now at 1024 px. It has no results yet.
+- **Why v2**: on the same held-out photos it improves cooked vegetables (asparagus) and fries
+  mask quality; see the comparison table below.
 
 ### Offline teachers: Grounding DINO + SAM 2.1
 
@@ -97,10 +99,11 @@ but no matching results have been committed: not measured.
 
 **Data**: the validation split of the Village dataset. It has 19 real photos in three whole
 held-out plate groups (`asparagus+chicken_p1`, `empty_p1`, `fries_p4`). No composites are
-included. Metrics are Ultralytics mask precision, recall, AP50 and AP50-95 at 640 px. They
+included. Metrics are Ultralytics mask precision, recall, AP50 and AP50-95, at each run's
+training size (640 px for v1, 1024 px for v2). They
 were computed against the auto-labels, which were reviewed by eye but not drawn by hand.
 
-**Results** (quoted from `eval/results/village-v1.json` / `eval/results/village-v1.md`):
+**`village-v1` results** (quoted from `eval/results/village-v1.json` / `eval/results/village-v1.md`):
 
 Overall mask mAP50 **0.755**, mask mAP50-95 **0.545**.
 
@@ -115,12 +118,46 @@ Overall mask mAP50 **0.755**, mask mAP50-95 **0.545**.
 \* fewer than 5 validation instances: too few to trust (`MIN_INSTANCES = 5` in
 `eval/segmentation.py`).
 
+**`village-v2` results** (quoted from `eval/results/village-v2.json` / `.md`):
+
+Held-out plates at 1024 px, mask mAP50 0.756, mask mAP50-95 0.615.
+
+| Class | Val images | Val instances | Precision | Recall | Mask AP50 | Mask AP50-95 |
+|---|---:|---:|---:|---:|---:|---:|
+| plate | 19 | 19 | 0.954 | 1.000 | 0.995 | 0.954 |
+| bowl * | 2 | 2 | 1.000 | 0.000 | 0.495 | 0.198 |
+| poultry * | 3 | 3 | 1.000 | 0.900 | 0.995 | 0.995 |
+| cooked_vegetables | 3 | 12 | 0.658 | 0.583 | 0.623 | 0.371 |
+| potatoes_fried_roasted | 12 | 26 | 0.559 | 0.654 | 0.669 | 0.556 |
+
+\* fewer than 5 validation instances: too few to trust.
+Classes with no validation instances are not listed; they have no held-out score.
+
+**v1 vs v2** (`eval/results/compare-v1-v2.md`, generated by `python -m eval.compare`):
+
+| | village-v1 | village-v2 (1024 px) |
+|---|---:|---:|
+| Mask mAP50, all classes | 0.755 | 0.756 |
+| Mask mAP50-95, all classes | 0.545 | 0.615 |
+| plate AP50 | 0.995 | 0.995 |
+| plate AP50-95 | 0.950 | 0.954 |
+| bowl * AP50 | 0.745 | 0.495 |
+| bowl * AP50-95 | 0.124 | 0.198 |
+| poultry * AP50 | 0.995 | 0.995 |
+| poultry * AP50-95 | 0.995 | 0.995 |
+| cooked_vegetables AP50 | 0.379 | 0.623 |
+| cooked_vegetables AP50-95 | 0.185 | 0.371 |
+| potatoes_fried_roasted AP50 | 0.664 | 0.669 |
+| potatoes_fried_roasted AP50-95 | 0.470 | 0.556 |
+
+\* fewer than 5 validation instances in at least one run: too few to trust.
+
 How to read this:
 
 - Plate segmentation is the only strong result with a meaningful sample (19 instances). The
   rest of the pipeline relies on it, because the plate sets the scale.
-- The food classes that have enough instances to read are weak: cooked vegetables reach mask
-  AP50 0.379 and fries reach 0.664. Each comes from a single held-out plate (asparagus and
+- The food classes that have enough instances to read are weak: in v1, cooked vegetables reach
+  mask AP50 0.379 and fries 0.664; in v2, 0.623 and 0.669. Each comes from a single held-out plate (asparagus and
   fries, respectively).
 - The overall mAP averages these five classes, so the untrustworthy `bowl` and `poultry` rows
   pull it in both directions. Do not quote the overall number without the table.
@@ -140,7 +177,6 @@ How to read this:
 | End-to-end (photo to grams per dish) | Not measured |
 | Other days, meals, lighting, the rig camera | Not measured |
 | `voxel51-v0` starting checkpoint | No held-out number committed |
-| `village-v2` (1024 px) | Training; no results |
 
 ## Known limitations and failure modes
 
@@ -179,7 +215,7 @@ How to read this:
 | Component | License | Note |
 | --- | --- | --- |
 | Ultralytics YOLO26 code and pretrained `yolo26n-seg.pt` | AGPL-3.0 | See below |
-| `village-v1` weights (derived from the above) | Treat as AGPL-3.0 | Ultralytics' stated position is that models trained from its weights fall under AGPL-3.0 unless an Enterprise license is bought |
+| `village-v1` and `village-v2` weights (derived from the above) | Treat as AGPL-3.0 | Ultralytics' stated position is that models trained from its weights fall under AGPL-3.0 unless an Enterprise license is bought |
 | Grounding DINO base | Apache-2.0 (Hugging Face model page) | Offline only |
 | SAM 2.1 Hiera small | Apache-2.0 (Hugging Face model page) | Offline only |
 | Depth Anything 3 Small; DA3METRIC-LARGE | Apache-2.0 (Hugging Face model pages) | Other DA3 checkpoints may differ; check before switching |
@@ -187,7 +223,7 @@ How to read this:
 | Voxel51 food-waste dataset | MIT (Hugging Face dataset page) | Used for the starting checkpoint |
 | This repository | No license file yet | |
 
-**AGPL-3.0 implication**: the live rig and API run `village-v1` through ONNX Runtime without the
+**AGPL-3.0 implication**: the live rig and API run `village-v2` through ONNX Runtime without the
 `ultralytics` package. The weights still derive from Ultralytics' AGPL-3.0 model. If Leftover
 Lens is deployed as a network service, for example the USC dashboard and API, AGPL-3.0
 requires offering the complete corresponding source to its users. The options are to release

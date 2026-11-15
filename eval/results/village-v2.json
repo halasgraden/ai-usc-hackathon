@@ -1,0 +1,62 @@
+{
+  "name": "village-v2",
+  "weights": "/content/drive/MyDrive/leftover-runs/village-v2/weights/best.pt",
+  "data": "/content/datasets/village/data.yaml",
+  "imgsz": 1024,
+  "overall": {
+    "mask_ap50": 0.7555156546347304,
+    "mask_ap50_95": 0.6147351596081494
+  },
+  "classes": [
+    {
+      "name": "plate",
+      "instances": 19,
+      "images": 19,
+      "precision": 0.9538220710421653,
+      "recall": 1.0,
+      "mask_ap50": 0.995,
+      "mask_ap50_95": 0.9537418377674957,
+      "reliable": true
+    },
+    {
+      "name": "bowl",
+      "instances": 2,
+      "images": 2,
+      "precision": 1.0,
+      "recall": 0.0,
+      "mask_ap50": 0.495,
+      "mask_ap50_95": 0.198,
+      "reliable": false
+    },
+    {
+      "name": "poultry",
+      "instances": 3,
+      "images": 3,
+      "precision": 1.0,
+      "recall": 0.9002286449294006,
+      "mask_ap50": 0.995,
+      "mask_ap50_95": 0.9949999999999999,
+      "reliable": false
+    },
+    {
+      "name": "cooked_vegetables",
+      "instances": 12,
+      "images": 3,
+      "precision": 0.6584631129120886,
+      "recall": 0.5833333333333334,
+      "mask_ap50": 0.6231304347826088,
+      "mask_ap50_95": 0.3713856311532767,
+      "reliable": true
+    },
+    {
+      "name": "potatoes_fried_roasted",
+      "instances": 26,
+      "images": 12,
+      "precision": 0.5589287718098969,
+      "recall": 0.6538461538461539,
+      "mask_ap50": 0.6694478383910433,
+      "mask_ap50_95": 0.5555483291199751,
+      "reliable": true
+    }
+  ]
+}

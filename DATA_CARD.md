@@ -1,6 +1,7 @@
 # Data card: Village plates v1
 
-This is the dataset used to fine-tune and evaluate the segmentation model `village-v1`
+This is the dataset used to fine-tune and evaluate the segmentation models `village-v1` and
+`village-v2` (same data; v2 trains at 1024 px)
 (see [MODEL_CARD.md](MODEL_CARD.md)). The photos and the exported dataset
 (`village-dataset.zip`) live in the team's Google Drive. They are not committed to this
 repository.
