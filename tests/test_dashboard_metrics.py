@@ -1,6 +1,7 @@
 """End-to-end metric contracts for the full-menu dashboard."""
 
 from datetime import date, datetime
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,7 +15,7 @@ from tests.test_api_dashboard import STAFF, post, region, settings_for
 
 
 @pytest.fixture
-def demo(tmp_path):
+def demo(tmp_path: Path) -> tuple[TestClient, Database]:
     settings = settings_for(tmp_path)
     db = Database(settings.database_url)
     seed(
@@ -27,7 +28,9 @@ def demo(tmp_path):
     return TestClient(create_app(settings)), db
 
 
-def test_full_menu_ranges_serving_weights_and_report_agree(demo):
+def test_full_menu_ranges_serving_weights_and_report_agree(
+    demo: tuple[TestClient, Database],
+) -> None:
     client, db = demo
     params = "start=2026-11-02&end=2026-11-08"
     data = client.get("/dashboard/dishes?" + params, headers=STAFF).json()
@@ -65,7 +68,9 @@ def test_full_menu_ranges_serving_weights_and_report_agree(demo):
         assert len(plates) > len({e.plate_id for e in events})  # clean plates retained
 
 
-def test_filters_match_across_summary_trends_detail_and_report(demo):
+def test_filters_match_across_summary_trends_detail_and_report(
+    demo: tuple[TestClient, Database],
+) -> None:
     client, _ = demo
     filters = "meal=Dinner&station=Flexitarian&search=rice"
     data = client.get(
@@ -86,7 +91,9 @@ def test_filters_match_across_summary_trends_detail_and_report(demo):
     assert detail["dish"] == data["rows"][0]
 
 
-def test_no_serving_comparison_for_live_or_incomplete_records(demo):
+def test_no_serving_comparison_for_live_or_incomplete_records(
+    demo: tuple[TestClient, Database],
+) -> None:
     client, db = demo
     post(
         client,
@@ -107,7 +114,7 @@ def test_no_serving_comparison_for_live_or_incomplete_records(demo):
     assert comparison([], []) is None
 
 
-def test_missing_meal_denominator_rejected(demo):
+def test_missing_meal_denominator_rejected(demo: tuple[TestClient, Database]) -> None:
     _, db = demo
     with Session(db.engine) as session:
         events = [e for e in session.exec(select(PlateEvent)).all() if e.dish_name == "Rice Pilaf"]
@@ -118,7 +125,7 @@ def test_missing_meal_denominator_rejected(demo):
         assert comparison(events, records[1:]) is None
 
 
-def test_partial_windows_and_empty_periods(demo):
+def test_partial_windows_and_empty_periods(demo: tuple[TestClient, Database]) -> None:
     client, _ = demo
     data = client.get("/dashboard/trends?start=2026-11-03&end=2026-11-05", headers=STAFF).json()
     assert data["weeks"][0]["partial"] is True
