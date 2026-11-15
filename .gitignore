@@ -20,3 +20,10 @@ runs/
 # dashboard
 node_modules/
 .next/
+# photos and labeled datasets: large, and plates are never committed
+training_data/
+training_data_named/
+leftover-photos*/
+*.heic
+*.HEIC
+*.zip

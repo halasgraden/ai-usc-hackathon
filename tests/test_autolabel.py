@@ -14,6 +14,7 @@ from labeling.autolabel import (
     parse_photo_name,
     resolve_label,
     split_groups,
+    split_items,
     to_yolo_seg_lines,
 )
 
@@ -104,3 +105,22 @@ def test_split_groups_is_deterministic_and_holds_out_whole_groups() -> None:
     assert val <= set(groups)
     assert any(g.startswith("fries") for g in val) and any(g.startswith("rice-pilaf") for g in val)
     assert "crepe_p1" not in val  # a single group stays in training
+
+
+def test_mixed_plate_prompt_asks_for_every_food() -> None:
+    assert split_items("asparagus+chicken") == ["asparagus", "chicken"]
+    assert split_items("empty") == ["empty"]
+    prompt, lookup = build_prompt("asparagus+chicken", ITEMS)
+    assert prompt == "plate . bowl . asparagus . roasted chicken ."
+    assert lookup["asparagus"] == "cooked_vegetables" and lookup["roasted chicken"] == "poultry"
+    with pytest.raises(KeyError):
+        build_prompt("fries+lasagna", ITEMS)
+
+
+def test_mixed_plate_name_parses_and_groups_by_its_first_item() -> None:
+    assert parse_photo_name("asparagus+chicken_p1_half_04.heic") == (
+        "asparagus+chicken",
+        "asparagus+chicken_p1",
+    )
+    val = split_groups(["asparagus+chicken_p1", "asparagus+chicken_p2", "asparagus+chicken_p3"])
+    assert len(val) == 1

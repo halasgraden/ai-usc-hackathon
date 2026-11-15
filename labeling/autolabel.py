@@ -59,19 +59,25 @@ def parse_photo_name(path: Path | str) -> tuple[str, str]:
     return item, group
 
 
+def split_items(item: str) -> list[str]:
+    """``"asparagus+chicken"`` -> ``["asparagus", "chicken"]``; ``"empty"`` -> ``["empty"]``."""
+    return [part for part in item.split("+") if part]
+
+
 def build_prompt(item: str, items: dict[str, PilotItem]) -> tuple[str, dict[str, str]]:
     """Grounding DINO prompt for one photo, and a phrase -> class-name lookup.
 
-    Raises KeyError for an item that is neither ``empty`` nor in ``items``.
+    ``item`` may name several foods joined by ``+`` for a mixed plate. Raises KeyError for a
+    slug that is neither ``empty`` nor in ``items``.
     """
     phrases = dict(STRUCTURE_PHRASES)
-    if item != EMPTY_ITEM:
-        pilot = items[item]
+    for slug in split_items(item):
+        if slug == EMPTY_ITEM:
+            continue
+        pilot = items[slug]
         phrases[pilot.phrase] = pilot.category.value
-    lookup = {phrase: cls for phrase, cls in phrases.items()}
-    lookup.update({v: v for v in STRUCTURE_PHRASES})
     prompt = " . ".join(phrases) + " ."
-    return prompt, lookup
+    return prompt, phrases
 
 
 def resolve_label(text: str, lookup: dict[str, str]) -> str | None:

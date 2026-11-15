@@ -1,1 +1,1 @@
-"""Offline teacher: SAM 3 turns category text prompts into training masks."""
+"""Offline teacher: Grounding DINO and SAM 2.1 turn text prompts into training masks."""

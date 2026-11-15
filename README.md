@@ -10,26 +10,29 @@ plate waste per dish. This fills that gap.
 
 ## How it works
 
-| Stage      | Module                             | What it does                                                                                                   |
-| ---------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 1. Capture | `capture/`                         | One sharp frame per plate from a phone on a stand; ArUco marker sets the scale; frames with a face are dropped |
-| 2. Segment | `labeling/`, `vision/`             | SAM 3 auto-labels training masks offline; a YOLO26n-seg model we train runs live through ONNX Runtime          |
-| 3. Match   | `menu/`                            | Imports today's Village menu; a region can only be one of today's dishes or "unknown"                          |
-| 4. Measure | `depth/`, `portion/`               | Depth map, plate-plane fit, volume in ml; grams = volume x bulk density                                        |
-| 5. Report  | `analytics/`, `api/`, `dashboard/` | Per-dish waste, flags, staff dashboard, USG report                                                             |
+| Stage | Module | What it does |
+| --- | --- | --- |
+| 1. Capture | `capture/` | One sharp frame per plate from a phone on a stand; ArUco marker sets the scale; frames with a face are dropped |
+| 2. Segment | `labeling/`, `vision/` | Grounding DINO + SAM 2.1 auto-label training masks offline; a YOLO26n-seg model we train runs live through ONNX Runtime |
+| 3. Match | `menu/` | Imports today's Village menu; a region can only be one of today's dishes or "unknown" |
+| 4. Measure | `depth/`, `portion/` | Depth map, plate-plane fit, volume in ml; grams = volume x bulk density |
+| 5. Report | `analytics/`, `api/`, `dashboard/` | Per-dish waste, flags, staff dashboard, USG report |
 
 ## Status
 
-| Module                                                            | State                                                                              |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `menu/` importer, cleaner, categorizer                            | Working, tested against a real Village menu                                        |
-| `portion/` grams and percent left                                 | Working, tested                                                                    |
-| `depth/plane.py` plane fit, height map, volume                    | Working, tested on synthetic geometry                                              |
-| `labeling/` Voxel51 converter, class map, mask geometry           | Working, tested on synthetic data; not yet run on the real dataset                 |
-| `vision/train.py`, `vision/export_onnx.py`                        | Written; need a GPU run (`notebooks/colab_train.ipynb`)                            |
-| `capture/`, `vision/infer.py`, `depth/estimator.py`, `analytics/` | Typed interfaces; tests marked `xfail` until implemented                           |
-| `api/`                                                            | `/health` and `/menu/{date}` work; `POST /plates` is authenticated but returns 501 |
-| `dashboard/`, `eval/`                                             | Not started; API and dashboard contracts are in `docs/CONTRACTS.md`                |
+| Module | State |
+| --- | --- |
+| `menu/` importer, cleaner, categorizer | Working, tested against a real Village menu |
+| `portion/` grams and percent left | Working, tested |
+| `depth/plane.py` plane fit, height map, volume | Working, tested on synthetic geometry |
+| `labeling/` Voxel51 converter, class map, mask geometry | Working; Voxel51 conversion run on the real dataset |
+| `labeling/autolabel.py` Grounding DINO + SAM 2.1 | Filtering, prompts, split and label export tested; model calls not yet run |
+| `augment/composite.py` paste and lighting augmentation | Working, tested on synthetic plates |
+| `vision/infer.py` ONNX decode, NMS, masks | Working, tested; checked on real photos with the Voxel51 baseline |
+| `vision/train.py`, `vision/export_onnx.py` | Written; need a GPU run (`notebooks/colab_train.ipynb`) |
+| `capture/`, `depth/estimator.py`, `analytics/` | Typed interfaces; tests marked `xfail` until implemented |
+| `api/` | `/health` and `/menu/{date}` work; `POST /plates` is authenticated but returns 501 |
+| `dashboard/`, `eval/` | Not started; API and dashboard contracts are in `docs/CONTRACTS.md` |
 
 ## Results
 
@@ -53,8 +56,9 @@ ruff check . && ruff format --check . && mypy . && pytest
 Or `docker compose up --build` for the API on port 8000.
 
 Extras: `.[vision]` for the live rig (OpenCV, ONNX Runtime), `.[train]` for
-Ultralytics training, `.[match]` for SigLIP. SAM 3 and Depth Anything 3 are
-installed from their own repositories on the GPU machine.
+Ultralytics training, `.[match]` for SigLIP. Grounding DINO and SAM 2.1 run in
+`notebooks/colab_autolabel.ipynb` through Hugging Face `transformers`; Depth Anything 3 is
+installed from its own repository on the GPU machine.
 
 ## The menu stage
 
@@ -70,7 +74,7 @@ file), `menu/cleaner.py` (roles, merging, implied dishes) and
 ```
 core/        shared types: FoodCategory, FoodRegion, PortionEstimate
 capture/     camera source, plate trigger, ArUco scale, face guard
-labeling/    SAM 3 auto-labeling from category prompts
+labeling/    Grounding DINO + SAM 2.1 auto-labeling, Voxel51 converter, pilot dish list
 augment/     copy-paste, geometric and photometric augmentation
 vision/      YOLO26n-seg training config, ONNX export, inference
 depth/       depth model wrapper, plate plane, height map, volume

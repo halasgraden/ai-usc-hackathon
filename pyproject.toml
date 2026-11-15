@@ -24,7 +24,8 @@ dependencies = [
 vision = ["opencv-contrib-python-headless>=4.10", "onnxruntime>=1.19"]
 # Training and matching. Versions are deliberately unpinned until the first
 # successful install; pin them in this file the moment training works.
-# SAM 3 and Depth Anything 3 install from their GitHub repos (see README).
+# Grounding DINO and SAM 2.1 load through transformers in the Colab notebook;
+# Depth Anything 3 installs from its GitHub repo (see README).
 train = ["ultralytics", "torch", "torchvision"]
 match = ["transformers", "torch", "pillow"]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.11", "types-PyYAML", "opencv-contrib-python-headless>=4.10"]
@@ -60,5 +61,5 @@ plugins = ["pydantic.mypy"]
 exclude = ["^dashboard/", "^build/"]
 
 [[tool.mypy.overrides]]
-module = ["cv2", "cv2.*", "onnxruntime", "ultralytics", "transformers", "torch", "fiftyone", "fiftyone.*"]
+module = ["cv2", "cv2.*", "onnxruntime", "ultralytics", "transformers", "torch", "fiftyone", "fiftyone.*", "PIL", "PIL.*", "pillow_heif"]
 ignore_missing_imports = true
