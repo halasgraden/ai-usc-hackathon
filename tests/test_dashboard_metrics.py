@@ -135,7 +135,7 @@ def test_partial_windows_and_empty_periods(demo: tuple[TestClient, Database]) ->
     assert empty["data_source"] == "seeded"
 
 
-def test_daily_totals_reconcile_with_week(demo):
+def test_daily_totals_reconcile_with_week(demo: tuple[TestClient, Database]) -> None:
     client, _ = demo
     data = client.get("/dashboard/trends?start=2026-11-02&end=2026-11-08", headers=STAFF).json()
     assert len(data["daily"]) == 7
